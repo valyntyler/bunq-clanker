@@ -151,6 +151,30 @@ class ResynthesizeRequest(BaseModel):
     location_context: LocationContext = LocationContext()
 
 
+class ChatTurn(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str
+
+
+class ChatRequest(BaseModel):
+    """Multi-turn chat grounded in an existing report.
+
+    The frontend keeps a copy of the latest Report and sends it back with each
+    turn — keeps the backend stateless. history is the prior turns (most
+    recent last). message is the current user turn.
+    """
+
+    ticker: str
+    report: Report
+    history: list[ChatTurn] = []
+    message: str
+
+
+class ChatResponse(BaseModel):
+    role: Literal["assistant"] = "assistant"
+    content: str
+
+
 class InvestRequest(BaseModel):
     ticker: str
     amount_eur: float = Field(gt=0)

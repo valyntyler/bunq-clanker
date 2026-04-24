@@ -14,6 +14,7 @@ import {
   type UserSource,
 } from "@/lib/api";
 import { AddEvidenceModal } from "@/components/AddEvidenceModal";
+import { ChatPanel } from "@/components/ChatPanel";
 import { VerdictBanner } from "@/components/VerdictBanner";
 import { SectionCard } from "@/components/SectionCard";
 import { PanelForecastCard } from "@/components/PanelForecastCard";
@@ -417,6 +418,8 @@ export default function AnalyzePage() {
           </ul>
         </section>
       )}
+
+      {report && <ChatPanel report={report} />}
 
       {report && (
         <footer className="border-t border-zinc-900 pt-4 text-[11px] text-zinc-600">

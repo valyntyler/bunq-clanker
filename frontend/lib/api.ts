@@ -204,6 +204,31 @@ export async function submitEvidence(
   );
 }
 
+export type UploadKind = "image" | "video" | "audio" | "pdf";
+
+export async function uploadEvidence(args: {
+  ticker: string;
+  companyName?: string;
+  sourceType: UploadKind;
+  file: File;
+  userNote?: string;
+  userTag?: EvidenceTag;
+}): Promise<UserSource> {
+  const fd = new FormData();
+  fd.set("ticker", args.ticker);
+  if (args.companyName) fd.set("company_name", args.companyName);
+  fd.set("source_type", args.sourceType);
+  fd.set("user_note", args.userNote ?? "");
+  fd.set("user_tag", args.userTag ?? "neutral");
+  fd.set("file", args.file);
+  return j<UserSource>(
+    await fetch(`${BACKEND_URL}/evidence/upload`, {
+      method: "POST",
+      body: fd,
+    })
+  );
+}
+
 export interface ResynthesizeRequest {
   ticker: string;
   company_name: string;
@@ -225,6 +250,60 @@ export async function resynthesize(
       body: JSON.stringify(req),
     })
   );
+}
+
+export interface ChatTurn {
+  role: "user" | "assistant";
+  content: string;
+}
+
+/** Streaming chat: invokes onToken with each text chunk; resolves on done. */
+export async function chatStream(args: {
+  ticker: string;
+  report: Report;
+  history: ChatTurn[];
+  message: string;
+  onToken: (s: string) => void;
+  signal?: AbortSignal;
+}): Promise<void> {
+  const r = await fetch(`${BACKEND_URL}/chat/stream`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      ticker: args.ticker,
+      report: args.report,
+      history: args.history,
+      message: args.message,
+    }),
+    signal: args.signal,
+  });
+  if (!r.ok || !r.body) throw new Error(`chat stream failed: ${r.status}`);
+  const reader = r.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) return;
+    buffer += decoder.decode(value, { stream: true });
+    let idx;
+    while ((idx = buffer.indexOf("\n\n")) >= 0) {
+      const chunk = buffer.slice(0, idx);
+      buffer = buffer.slice(idx + 2);
+      for (const line of chunk.split("\n")) {
+        if (!line.startsWith("data: ")) continue;
+        const payload = line.slice(6).trim();
+        if (!payload) continue;
+        try {
+          const ev = JSON.parse(payload);
+          if (typeof ev.token === "string") args.onToken(ev.token);
+          if (ev.done) return;
+          if (ev.error) throw new Error(ev.error);
+        } catch {
+          // ignore parse errors
+        }
+      }
+    }
+  }
 }
 
 // ---- streaming analyze --------------------------------------------------

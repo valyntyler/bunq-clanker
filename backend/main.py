@@ -23,19 +23,25 @@ import asyncio
 import json as _json
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 
 load_dotenv()
 
 from backend.analyzers.consumer_panel import analyze_consumer_panel
+from backend.analyzers.user_image import analyze_user_image
+from backend.analyzers.user_pdf import analyze_user_pdf
 from backend.analyzers.user_text import analyze_user_text
+from backend.analyzers.user_video import analyze_user_video
 from backend.integrations import alpaca as alpaca_i
 from backend.integrations import bunq as bunq_i
+from backend.analyzers.chat import chat_once, chat_stream
 from backend.analyzers.synthesizer import synthesize
 from backend.models import (
     AnalyzeRequest,
+    ChatRequest,
+    ChatResponse,
     ConsumerPanelForecast,
     EvidenceRequest,
     InvestReceipt,
@@ -135,6 +141,69 @@ async def analyze_stream_route(req: AnalyzeRequest) -> StreamingResponse:
     )
 
 
+@app.post("/chat", response_model=ChatResponse)
+async def chat(req: ChatRequest) -> ChatResponse:
+    """Single-shot chat about an existing report."""
+    if not req.message.strip():
+        raise HTTPException(400, "empty message")
+    text = await asyncio.to_thread(chat_once, req.report, req.history, req.message)
+    return ChatResponse(role="assistant", content=text)
+
+
+@app.post("/chat/stream")
+async def chat_stream_route(req: ChatRequest) -> StreamingResponse:
+    """SSE-streamed chat — emits {token: '...'} per content delta."""
+    if not req.message.strip():
+        raise HTTPException(400, "empty message")
+
+    async def event_gen():
+        try:
+            for token in chat_stream(req.report, req.history, req.message):
+                yield f"data: {_json.dumps({'token': token})}\n\n"
+            yield f"data: {_json.dumps({'done': True})}\n\n"
+        except Exception as e:  # noqa: BLE001
+            log.exception("chat_stream failed")
+            yield f"data: {_json.dumps({'error': str(e)})}\n\n"
+
+    # Run the blocking generator in a thread so we don't starve the event loop
+    async def threaded_gen():
+        loop = asyncio.get_event_loop()
+        queue: asyncio.Queue[str | None] = asyncio.Queue()
+
+        def producer():
+            try:
+                for token in chat_stream(req.report, req.history, req.message):
+                    asyncio.run_coroutine_threadsafe(queue.put(token), loop)
+            except Exception as e:  # noqa: BLE001
+                asyncio.run_coroutine_threadsafe(
+                    queue.put(f"__error__:{e}"), loop
+                )
+            finally:
+                asyncio.run_coroutine_threadsafe(queue.put(None), loop)
+
+        loop.run_in_executor(None, producer)
+
+        while True:
+            item = await queue.get()
+            if item is None:
+                yield f"data: {_json.dumps({'done': True})}\n\n"
+                return
+            if isinstance(item, str) and item.startswith("__error__:"):
+                yield f"data: {_json.dumps({'error': item[10:]})}\n\n"
+                return
+            yield f"data: {_json.dumps({'token': item})}\n\n"
+
+    return StreamingResponse(
+        threaded_gen(),
+        media_type="text/event-stream",
+        headers={
+            "cache-control": "no-cache",
+            "x-accel-buffering": "no",
+            "connection": "keep-alive",
+        },
+    )
+
+
 @app.post("/resynthesize", response_model=Report)
 async def resynthesize(req: ResynthesizeRequest) -> Report:
     """Re-run the synthesizer with the original modules + new user_sources.
@@ -171,6 +240,88 @@ async def resynthesize(req: ResynthesizeRequest) -> Report:
         conflicts=synth.get("conflicts", []),
         data_gaps=synth.get("data_gaps", []),
     )
+
+
+MAX_UPLOAD_BYTES = {
+    "image": 10 * 1024 * 1024,   # 10 MB
+    "video": 60 * 1024 * 1024,   # 60 MB (~1 min @ 720p)
+    "audio": 30 * 1024 * 1024,   # 30 MB
+    "pdf":   15 * 1024 * 1024,   # 15 MB
+}
+
+
+@app.post("/evidence/upload", response_model=UserSource)
+async def evidence_upload(
+    ticker: str = Form(...),
+    source_type: str = Form(...),  # "image" | "video" | "audio" | "pdf"
+    user_note: str = Form(""),
+    user_tag: str = Form("neutral"),
+    company_name: str | None = Form(None),
+    file: UploadFile = File(...),
+) -> UserSource:
+    """Multipart upload for image / video / audio / pdf evidence."""
+    if source_type not in MAX_UPLOAD_BYTES:
+        raise HTTPException(400, f"unsupported source_type {source_type}")
+
+    content = await file.read()
+    if not content:
+        raise HTTPException(400, "empty upload")
+    if len(content) > MAX_UPLOAD_BYTES[source_type]:
+        raise HTTPException(
+            413,
+            f"file too large for source_type={source_type} "
+            f"(>{MAX_UPLOAD_BYTES[source_type] // (1024 * 1024)}MB)",
+        )
+
+    if user_tag not in ("supporting", "contradicting", "neutral"):
+        user_tag = "neutral"
+
+    if source_type == "image":
+        return await asyncio.to_thread(
+            analyze_user_image,
+            ticker=ticker,
+            company_name=company_name,
+            image_bytes=content,
+            content_type=file.content_type,
+            user_note=user_note,
+            user_tag=user_tag,  # type: ignore[arg-type]
+            filename=file.filename,
+        )
+    if source_type == "video":
+        return await asyncio.to_thread(
+            analyze_user_video,
+            ticker=ticker,
+            company_name=company_name,
+            video_bytes=content,
+            content_type=file.content_type,
+            user_note=user_note,
+            user_tag=user_tag,  # type: ignore[arg-type]
+            filename=file.filename,
+            is_audio_only=False,
+        )
+    if source_type == "audio":
+        return await asyncio.to_thread(
+            analyze_user_video,
+            ticker=ticker,
+            company_name=company_name,
+            video_bytes=content,
+            content_type=file.content_type,
+            user_note=user_note,
+            user_tag=user_tag,  # type: ignore[arg-type]
+            filename=file.filename,
+            is_audio_only=True,
+        )
+    if source_type == "pdf":
+        return await asyncio.to_thread(
+            analyze_user_pdf,
+            ticker=ticker,
+            company_name=company_name,
+            pdf_bytes=content,
+            user_note=user_note,
+            user_tag=user_tag,  # type: ignore[arg-type]
+            filename=file.filename,
+        )
+    raise HTTPException(500, f"unhandled source_type {source_type}")
 
 
 @app.post("/evidence", response_model=UserSource)
