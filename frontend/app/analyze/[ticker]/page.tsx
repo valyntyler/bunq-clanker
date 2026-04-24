@@ -278,26 +278,84 @@ export default function AnalyzePage() {
             {geoOverlays.map((g) => (
               <div
                 key={g.event_id}
-                className="rounded-lg border border-amber-900/50 bg-amber-950/20 p-4"
+                className="overflow-hidden rounded-lg border border-amber-900/50 bg-amber-950/20"
               >
-                <div className="flex items-center justify-between">
-                  <div className="text-sm font-semibold text-amber-200">
-                    {g.speaker}{" "}
-                    <span className="font-mono text-[10px] text-amber-500">
-                      {g.event_id}
-                    </span>
-                  </div>
-                  <div className="text-xs font-mono text-amber-400">
-                    rel {g.relevance.toFixed(2)} · impact{" "}
-                    {g.impact_direction > 0
-                      ? "+"
-                      : g.impact_direction < 0
-                        ? "−"
-                        : "·"}
-                    {g.impact_magnitude.toFixed(2)}
+                <div className="grid gap-4 p-4 md:grid-cols-[260px_1fr]">
+                  {g.clip_url ? (
+                    <video
+                      src={g.clip_url}
+                      controls
+                      preload="metadata"
+                      playsInline
+                      className="aspect-video w-full rounded-md bg-black"
+                    />
+                  ) : (
+                    <div className="flex aspect-video w-full items-center justify-center rounded-md border border-dashed border-amber-900/50 text-[10px] font-mono uppercase tracking-wider text-amber-700">
+                      live RSS · text-only
+                    </div>
+                  )}
+                  <div>
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <div className="text-sm font-semibold text-amber-200">
+                          {g.speaker}
+                          {g.clip_url && (
+                            <span className="ml-2 rounded bg-amber-900/60 px-1.5 py-0.5 text-[9px] font-mono uppercase tracking-wider text-amber-200">
+                              video · prosody · vision
+                            </span>
+                          )}
+                        </div>
+                        <div className="mt-0.5 font-mono text-[10px] text-amber-500">
+                          {g.event_id}
+                        </div>
+                      </div>
+                      <div className="text-right text-xs font-mono text-amber-400">
+                        <div>rel {g.relevance.toFixed(2)}</div>
+                        <div>
+                          impact{" "}
+                          {g.impact_direction > 0
+                            ? "+"
+                            : g.impact_direction < 0
+                              ? "−"
+                              : "·"}
+                          {g.impact_magnitude.toFixed(2)}
+                        </div>
+                      </div>
+                    </div>
+                    <p className="mt-2 text-sm text-amber-100/90">
+                      {g.reasoning}
+                    </p>
+                    {g.transcript_excerpt && (
+                      <blockquote className="mt-2 border-l-2 border-amber-700 pl-3 text-xs italic text-amber-300/80">
+                        “{g.transcript_excerpt}”
+                      </blockquote>
+                    )}
+                    {(g.tone_notes || g.visual_notes) && (
+                      <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                        {g.tone_notes && (
+                          <div className="rounded border border-amber-900/40 bg-amber-950/40 p-2">
+                            <div className="text-[9px] font-mono uppercase tracking-wider text-amber-500">
+                              tone (audio)
+                            </div>
+                            <div className="mt-1 text-xs text-amber-100/85">
+                              {g.tone_notes}
+                            </div>
+                          </div>
+                        )}
+                        {g.visual_notes && (
+                          <div className="rounded border border-amber-900/40 bg-amber-950/40 p-2">
+                            <div className="text-[9px] font-mono uppercase tracking-wider text-amber-500">
+                              visual (frame grid)
+                            </div>
+                            <div className="mt-1 text-xs text-amber-100/85">
+                              {g.visual_notes}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
-                <p className="mt-2 text-sm text-amber-100/80">{g.reasoning}</p>
               </div>
             ))}
           </div>

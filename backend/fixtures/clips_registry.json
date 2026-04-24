@@ -1,0 +1,84 @@
+{
+  "clips": [
+    {
+      "event_id": "ecb-lagarde-press-recent",
+      "speaker": "ECB President",
+      "title": "ECB rate-decision press conference (excerpt)",
+      "source_url": "ytsearch1:ECB Lagarde press conference monetary policy",
+      "duration_s": 30.0,
+      "transcript": "Inflation has been at around 2% target. Longer-term inflation expectations are well anchored, and the economy has shown resilience over recent quarters. The incoming information in the period ahead will help us assess how the war will affect the inflation outlook and the risks surrounding it. We are closely monitoring the situation, and our data dependent approach will help us set monetary policy.",
+      "prosody": {
+        "duration_s": 30.0,
+        "pitch_mean_hz": 180.16561066870395,
+        "pitch_std_hz": 52.664971832168455,
+        "rms_mean": 0.03642489016056061,
+        "rms_std": 0.024914437904953957,
+        "silence_fraction": 0.20042643923240938
+      },
+      "s3_mp4": "s3://sauron-wallet/clips/ecb-lagarde-press-recent.mp4",
+      "s3_audio": "s3://sauron-wallet/clips/ecb-lagarde-press-recent.wav",
+      "s3_grid": "s3://sauron-wallet/clips/ecb-lagarde-press-recent.grid.png",
+      "clip_url": "https://sauron-wallet.s3.amazonaws.com/clips/ecb-lagarde-press-recent.mp4?AWSAccessKeyId=ASIA2BHYPTPSR3Q5JUCH&Signature=m2hjkHq4WVNFaCv9EZ0IicLUCvs%3D&x-amz-security-token=IQoJb3JpZ2luX2VjEL3%2F%2F%2F%2F%2F%2F%2F%2F%2F%2FwEaCXVzLWVhc3QtMSJHMEUCIBrxkj%2FG59ifGI6WsbAIHMLno5XjMxf3WAIoRANEa48rAiEA2RXyA8Ezz3%2F7BHoEcxcjZj7qkFvKkOdb1i36aXGS%2FtkqogIIhf%2F%2F%2F%2F%2F%2F%2F%2F%2F%2FARABGgw2ODk4NjMzNjc2NTMiDOK%2B1szdkDIW2qCWOir2AWUgXPexCFqdj0mQgPjhJEeI4gohVbAODaLY0jClGTrVCL2p3nmFsTfITd5AIAjddelKvBsM666GhipovJx%2F1vHBYKnFan6WHIINL1Is0FqzasvajEhAyZ0U6ZbLjJQiW%2BPe57ajL8ngoQ6IRMgrRCqtL59hEHooCpFklSUuSIIed6xzf543im3ANyIftlADBrkTd%2BgTcgBSeq5E1JV%2BGJUGXSUkPsaicRLOgd%2Fstoxhcl8pyL0U1MVQX11Xr27y%2Bubys%2B1DI3cHPznzBplzlL7FptKWsJSLoVlXQUFFbc7Rx7GSMPbKkvT7gGrxWBJkTHKv1KoRczDNoa%2FPBjqdAe7ZgyP7St5xwTy8CqU25RINO9KYdrsyY9iV7KzdHJuN9D%2BYWnMvindK59sCkJ2KwFY2pr8cuYfJTBIbgPHjvoquHgaClxOsT%2F4Pbb1RPb2pk0m9A%2FDku6EF48G1IidqYEY6BZTnPgTwGNdrwDYJ6PgSPqjBj6p0FlFs%2Fx9mKZNQBgDrVmEBbY6JHz82w%2F9WqMvqiETP1X7voLDDubI%3D&Expires=1777676768",
+      "frame_grid_url": "https://sauron-wallet.s3.amazonaws.com/clips/ecb-lagarde-press-recent.grid.png?AWSAccessKeyId=ASIA2BHYPTPSR3Q5JUCH&Signature=4K%2Bdvc%2FHee1CpR7ahua0KqHIr%2B8%3D&x-amz-security-token=IQoJb3JpZ2luX2VjEL3%2F%2F%2F%2F%2F%2F%2F%2F%2F%2FwEaCXVzLWVhc3QtMSJHMEUCIBrxkj%2FG59ifGI6WsbAIHMLno5XjMxf3WAIoRANEa48rAiEA2RXyA8Ezz3%2F7BHoEcxcjZj7qkFvKkOdb1i36aXGS%2FtkqogIIhf%2F%2F%2F%2F%2F%2F%2F%2F%2F%2FARABGgw2ODk4NjMzNjc2NTMiDOK%2B1szdkDIW2qCWOir2AWUgXPexCFqdj0mQgPjhJEeI4gohVbAODaLY0jClGTrVCL2p3nmFsTfITd5AIAjddelKvBsM666GhipovJx%2F1vHBYKnFan6WHIINL1Is0FqzasvajEhAyZ0U6ZbLjJQiW%2BPe57ajL8ngoQ6IRMgrRCqtL59hEHooCpFklSUuSIIed6xzf543im3ANyIftlADBrkTd%2BgTcgBSeq5E1JV%2BGJUGXSUkPsaicRLOgd%2Fstoxhcl8pyL0U1MVQX11Xr27y%2Bubys%2B1DI3cHPznzBplzlL7FptKWsJSLoVlXQUFFbc7Rx7GSMPbKkvT7gGrxWBJkTHKv1KoRczDNoa%2FPBjqdAe7ZgyP7St5xwTy8CqU25RINO9KYdrsyY9iV7KzdHJuN9D%2BYWnMvindK59sCkJ2KwFY2pr8cuYfJTBIbgPHjvoquHgaClxOsT%2F4Pbb1RPb2pk0m9A%2FDku6EF48G1IidqYEY6BZTnPgTwGNdrwDYJ6PgSPqjBj6p0FlFs%2Fx9mKZNQBgDrVmEBbY6JHz82w%2F9WqMvqiETP1X7voLDDubI%3D&Expires=1777676768",
+      "audio_url": "https://sauron-wallet.s3.amazonaws.com/clips/ecb-lagarde-press-recent.wav?AWSAccessKeyId=ASIA2BHYPTPSR3Q5JUCH&Signature=RKWf6BvEAFEK3WUDsmRypaMA2pY%3D&x-amz-security-token=IQoJb3JpZ2luX2VjEL3%2F%2F%2F%2F%2F%2F%2F%2F%2F%2FwEaCXVzLWVhc3QtMSJHMEUCIBrxkj%2FG59ifGI6WsbAIHMLno5XjMxf3WAIoRANEa48rAiEA2RXyA8Ezz3%2F7BHoEcxcjZj7qkFvKkOdb1i36aXGS%2FtkqogIIhf%2F%2F%2F%2F%2F%2F%2F%2F%2F%2FARABGgw2ODk4NjMzNjc2NTMiDOK%2B1szdkDIW2qCWOir2AWUgXPexCFqdj0mQgPjhJEeI4gohVbAODaLY0jClGTrVCL2p3nmFsTfITd5AIAjddelKvBsM666GhipovJx%2F1vHBYKnFan6WHIINL1Is0FqzasvajEhAyZ0U6ZbLjJQiW%2BPe57ajL8ngoQ6IRMgrRCqtL59hEHooCpFklSUuSIIed6xzf543im3ANyIftlADBrkTd%2BgTcgBSeq5E1JV%2BGJUGXSUkPsaicRLOgd%2Fstoxhcl8pyL0U1MVQX11Xr27y%2Bubys%2B1DI3cHPznzBplzlL7FptKWsJSLoVlXQUFFbc7Rx7GSMPbKkvT7gGrxWBJkTHKv1KoRczDNoa%2FPBjqdAe7ZgyP7St5xwTy8CqU25RINO9KYdrsyY9iV7KzdHJuN9D%2BYWnMvindK59sCkJ2KwFY2pr8cuYfJTBIbgPHjvoquHgaClxOsT%2F4Pbb1RPb2pk0m9A%2FDku6EF48G1IidqYEY6BZTnPgTwGNdrwDYJ6PgSPqjBj6p0FlFs%2Fx9mKZNQBgDrVmEBbY6JHz82w%2F9WqMvqiETP1X7voLDDubI%3D&Expires=1777676768"
+    },
+    {
+      "event_id": "trump-tariffs-recent",
+      "speaker": "US President",
+      "title": "Tariff policy statement (excerpt)",
+      "source_url": "ytsearch1:Trump tariffs announcement statement",
+      "duration_s": 30.0,
+      "transcript": "They're so happy. And they're dancing in the streets, but they won't be dancing for long, that I can assure you. The Democrats on the court. are thrilled, but they will automatically vote no. They're an automatic no, just like in Congress, they're an automatic no. They're against anything that makes America strong, healthy. And great again. They also are a frankly, disgrace to our nation.",
+      "prosody": {
+        "duration_s": 30.0,
+        "pitch_mean_hz": 127.83740882823855,
+        "pitch_std_hz": 37.55517741699773,
+        "rms_mean": 0.03281421959400177,
+        "rms_std": 0.031239621341228485,
+        "silence_fraction": 0.20042643923240938
+      },
+      "s3_mp4": "s3://sauron-wallet/clips/trump-tariffs-recent.mp4",
+      "s3_audio": "s3://sauron-wallet/clips/trump-tariffs-recent.wav",
+      "s3_grid": "s3://sauron-wallet/clips/trump-tariffs-recent.grid.png",
+      "clip_url": "https://sauron-wallet.s3.amazonaws.com/clips/trump-tariffs-recent.mp4?AWSAccessKeyId=ASIA2BHYPTPSR3Q5JUCH&Signature=mI%2FS4SLrcj2DLVhoHupPQxZKX9c%3D&x-amz-security-token=IQoJb3JpZ2luX2VjEL3%2F%2F%2F%2F%2F%2F%2F%2F%2F%2FwEaCXVzLWVhc3QtMSJHMEUCIBrxkj%2FG59ifGI6WsbAIHMLno5XjMxf3WAIoRANEa48rAiEA2RXyA8Ezz3%2F7BHoEcxcjZj7qkFvKkOdb1i36aXGS%2FtkqogIIhf%2F%2F%2F%2F%2F%2F%2F%2F%2F%2FARABGgw2ODk4NjMzNjc2NTMiDOK%2B1szdkDIW2qCWOir2AWUgXPexCFqdj0mQgPjhJEeI4gohVbAODaLY0jClGTrVCL2p3nmFsTfITd5AIAjddelKvBsM666GhipovJx%2F1vHBYKnFan6WHIINL1Is0FqzasvajEhAyZ0U6ZbLjJQiW%2BPe57ajL8ngoQ6IRMgrRCqtL59hEHooCpFklSUuSIIed6xzf543im3ANyIftlADBrkTd%2BgTcgBSeq5E1JV%2BGJUGXSUkPsaicRLOgd%2Fstoxhcl8pyL0U1MVQX11Xr27y%2Bubys%2B1DI3cHPznzBplzlL7FptKWsJSLoVlXQUFFbc7Rx7GSMPbKkvT7gGrxWBJkTHKv1KoRczDNoa%2FPBjqdAe7ZgyP7St5xwTy8CqU25RINO9KYdrsyY9iV7KzdHJuN9D%2BYWnMvindK59sCkJ2KwFY2pr8cuYfJTBIbgPHjvoquHgaClxOsT%2F4Pbb1RPb2pk0m9A%2FDku6EF48G1IidqYEY6BZTnPgTwGNdrwDYJ6PgSPqjBj6p0FlFs%2Fx9mKZNQBgDrVmEBbY6JHz82w%2F9WqMvqiETP1X7voLDDubI%3D&Expires=1777676784",
+      "frame_grid_url": "https://sauron-wallet.s3.amazonaws.com/clips/trump-tariffs-recent.grid.png?AWSAccessKeyId=ASIA2BHYPTPSR3Q5JUCH&Signature=YFWU78l7ZYh5ngLQto%2FZiCyvFCM%3D&x-amz-security-token=IQoJb3JpZ2luX2VjEL3%2F%2F%2F%2F%2F%2F%2F%2F%2F%2FwEaCXVzLWVhc3QtMSJHMEUCIBrxkj%2FG59ifGI6WsbAIHMLno5XjMxf3WAIoRANEa48rAiEA2RXyA8Ezz3%2F7BHoEcxcjZj7qkFvKkOdb1i36aXGS%2FtkqogIIhf%2F%2F%2F%2F%2F%2F%2F%2F%2F%2FARABGgw2ODk4NjMzNjc2NTMiDOK%2B1szdkDIW2qCWOir2AWUgXPexCFqdj0mQgPjhJEeI4gohVbAODaLY0jClGTrVCL2p3nmFsTfITd5AIAjddelKvBsM666GhipovJx%2F1vHBYKnFan6WHIINL1Is0FqzasvajEhAyZ0U6ZbLjJQiW%2BPe57ajL8ngoQ6IRMgrRCqtL59hEHooCpFklSUuSIIed6xzf543im3ANyIftlADBrkTd%2BgTcgBSeq5E1JV%2BGJUGXSUkPsaicRLOgd%2Fstoxhcl8pyL0U1MVQX11Xr27y%2Bubys%2B1DI3cHPznzBplzlL7FptKWsJSLoVlXQUFFbc7Rx7GSMPbKkvT7gGrxWBJkTHKv1KoRczDNoa%2FPBjqdAe7ZgyP7St5xwTy8CqU25RINO9KYdrsyY9iV7KzdHJuN9D%2BYWnMvindK59sCkJ2KwFY2pr8cuYfJTBIbgPHjvoquHgaClxOsT%2F4Pbb1RPb2pk0m9A%2FDku6EF48G1IidqYEY6BZTnPgTwGNdrwDYJ6PgSPqjBj6p0FlFs%2Fx9mKZNQBgDrVmEBbY6JHz82w%2F9WqMvqiETP1X7voLDDubI%3D&Expires=1777676784",
+      "audio_url": "https://sauron-wallet.s3.amazonaws.com/clips/trump-tariffs-recent.wav?AWSAccessKeyId=ASIA2BHYPTPSR3Q5JUCH&Signature=SnG9m6VMQB%2BtM2gPMASMcv%2BKHzA%3D&x-amz-security-token=IQoJb3JpZ2luX2VjEL3%2F%2F%2F%2F%2F%2F%2F%2F%2F%2FwEaCXVzLWVhc3QtMSJHMEUCIBrxkj%2FG59ifGI6WsbAIHMLno5XjMxf3WAIoRANEa48rAiEA2RXyA8Ezz3%2F7BHoEcxcjZj7qkFvKkOdb1i36aXGS%2FtkqogIIhf%2F%2F%2F%2F%2F%2F%2F%2F%2F%2FARABGgw2ODk4NjMzNjc2NTMiDOK%2B1szdkDIW2qCWOir2AWUgXPexCFqdj0mQgPjhJEeI4gohVbAODaLY0jClGTrVCL2p3nmFsTfITd5AIAjddelKvBsM666GhipovJx%2F1vHBYKnFan6WHIINL1Is0FqzasvajEhAyZ0U6ZbLjJQiW%2BPe57ajL8ngoQ6IRMgrRCqtL59hEHooCpFklSUuSIIed6xzf543im3ANyIftlADBrkTd%2BgTcgBSeq5E1JV%2BGJUGXSUkPsaicRLOgd%2Fstoxhcl8pyL0U1MVQX11Xr27y%2Bubys%2B1DI3cHPznzBplzlL7FptKWsJSLoVlXQUFFbc7Rx7GSMPbKkvT7gGrxWBJkTHKv1KoRczDNoa%2FPBjqdAe7ZgyP7St5xwTy8CqU25RINO9KYdrsyY9iV7KzdHJuN9D%2BYWnMvindK59sCkJ2KwFY2pr8cuYfJTBIbgPHjvoquHgaClxOsT%2F4Pbb1RPb2pk0m9A%2FDku6EF48G1IidqYEY6BZTnPgTwGNdrwDYJ6PgSPqjBj6p0FlFs%2Fx9mKZNQBgDrVmEBbY6JHz82w%2F9WqMvqiETP1X7voLDDubI%3D&Expires=1777676784"
+    },
+    {
+      "event_id": "eu-commission-ai-act",
+      "speaker": "EU Commission",
+      "title": "EU AI Act announcement (excerpt)",
+      "source_url": "ytsearch1:European Commission AI Act announcement",
+      "duration_s": 30.0,
+      "transcript": "We are also proposing European business wallets, which offer a digital solution for businesses to interact effortlessly with authorities and also other businesses across the European Union. Finally, we have here our first digital omnibus. It simplifies digital rules in the areas of artificial intelligence, cybersecurity and data. Commissioner Dombrovskis will shortly continue by telling you more about the joint simplification agenda of this Commission, and Commissioner Mcrath will elaborate.",
+      "prosody": {
+        "duration_s": 30.0,
+        "pitch_mean_hz": 255.26506852463817,
+        "pitch_std_hz": 49.605467882089414,
+        "rms_mean": 0.028398049995303154,
+        "rms_std": 0.015481393784284592,
+        "silence_fraction": 0.20042643923240938
+      },
+      "s3_mp4": "s3://sauron-wallet/clips/eu-commission-ai-act.mp4",
+      "s3_audio": "s3://sauron-wallet/clips/eu-commission-ai-act.wav",
+      "s3_grid": "s3://sauron-wallet/clips/eu-commission-ai-act.grid.png",
+      "clip_url": "https://sauron-wallet.s3.amazonaws.com/clips/eu-commission-ai-act.mp4?AWSAccessKeyId=ASIA2BHYPTPSR3Q5JUCH&Signature=KIyRyzEtCMFt%2B3OUNCEMZwz4Grs%3D&x-amz-security-token=IQoJb3JpZ2luX2VjEL3%2F%2F%2F%2F%2F%2F%2F%2F%2F%2FwEaCXVzLWVhc3QtMSJHMEUCIBrxkj%2FG59ifGI6WsbAIHMLno5XjMxf3WAIoRANEa48rAiEA2RXyA8Ezz3%2F7BHoEcxcjZj7qkFvKkOdb1i36aXGS%2FtkqogIIhf%2F%2F%2F%2F%2F%2F%2F%2F%2F%2FARABGgw2ODk4NjMzNjc2NTMiDOK%2B1szdkDIW2qCWOir2AWUgXPexCFqdj0mQgPjhJEeI4gohVbAODaLY0jClGTrVCL2p3nmFsTfITd5AIAjddelKvBsM666GhipovJx%2F1vHBYKnFan6WHIINL1Is0FqzasvajEhAyZ0U6ZbLjJQiW%2BPe57ajL8ngoQ6IRMgrRCqtL59hEHooCpFklSUuSIIed6xzf543im3ANyIftlADBrkTd%2BgTcgBSeq5E1JV%2BGJUGXSUkPsaicRLOgd%2Fstoxhcl8pyL0U1MVQX11Xr27y%2Bubys%2B1DI3cHPznzBplzlL7FptKWsJSLoVlXQUFFbc7Rx7GSMPbKkvT7gGrxWBJkTHKv1KoRczDNoa%2FPBjqdAe7ZgyP7St5xwTy8CqU25RINO9KYdrsyY9iV7KzdHJuN9D%2BYWnMvindK59sCkJ2KwFY2pr8cuYfJTBIbgPHjvoquHgaClxOsT%2F4Pbb1RPb2pk0m9A%2FDku6EF48G1IidqYEY6BZTnPgTwGNdrwDYJ6PgSPqjBj6p0FlFs%2Fx9mKZNQBgDrVmEBbY6JHz82w%2F9WqMvqiETP1X7voLDDubI%3D&Expires=1777676800",
+      "frame_grid_url": "https://sauron-wallet.s3.amazonaws.com/clips/eu-commission-ai-act.grid.png?AWSAccessKeyId=ASIA2BHYPTPSR3Q5JUCH&Signature=rPxArlTAN4d7xk7%2Bgn1cKb7bscc%3D&x-amz-security-token=IQoJb3JpZ2luX2VjEL3%2F%2F%2F%2F%2F%2F%2F%2F%2F%2FwEaCXVzLWVhc3QtMSJHMEUCIBrxkj%2FG59ifGI6WsbAIHMLno5XjMxf3WAIoRANEa48rAiEA2RXyA8Ezz3%2F7BHoEcxcjZj7qkFvKkOdb1i36aXGS%2FtkqogIIhf%2F%2F%2F%2F%2F%2F%2F%2F%2F%2FARABGgw2ODk4NjMzNjc2NTMiDOK%2B1szdkDIW2qCWOir2AWUgXPexCFqdj0mQgPjhJEeI4gohVbAODaLY0jClGTrVCL2p3nmFsTfITd5AIAjddelKvBsM666GhipovJx%2F1vHBYKnFan6WHIINL1Is0FqzasvajEhAyZ0U6ZbLjJQiW%2BPe57ajL8ngoQ6IRMgrRCqtL59hEHooCpFklSUuSIIed6xzf543im3ANyIftlADBrkTd%2BgTcgBSeq5E1JV%2BGJUGXSUkPsaicRLOgd%2Fstoxhcl8pyL0U1MVQX11Xr27y%2Bubys%2B1DI3cHPznzBplzlL7FptKWsJSLoVlXQUFFbc7Rx7GSMPbKkvT7gGrxWBJkTHKv1KoRczDNoa%2FPBjqdAe7ZgyP7St5xwTy8CqU25RINO9KYdrsyY9iV7KzdHJuN9D%2BYWnMvindK59sCkJ2KwFY2pr8cuYfJTBIbgPHjvoquHgaClxOsT%2F4Pbb1RPb2pk0m9A%2FDku6EF48G1IidqYEY6BZTnPgTwGNdrwDYJ6PgSPqjBj6p0FlFs%2Fx9mKZNQBgDrVmEBbY6JHz82w%2F9WqMvqiETP1X7voLDDubI%3D&Expires=1777676800",
+      "audio_url": "https://sauron-wallet.s3.amazonaws.com/clips/eu-commission-ai-act.wav?AWSAccessKeyId=ASIA2BHYPTPSR3Q5JUCH&Signature=16T9Cz6Hw0dPZ6xbkS%2Fq%2B%2B%2FxyLQ%3D&x-amz-security-token=IQoJb3JpZ2luX2VjEL3%2F%2F%2F%2F%2F%2F%2F%2F%2F%2FwEaCXVzLWVhc3QtMSJHMEUCIBrxkj%2FG59ifGI6WsbAIHMLno5XjMxf3WAIoRANEa48rAiEA2RXyA8Ezz3%2F7BHoEcxcjZj7qkFvKkOdb1i36aXGS%2FtkqogIIhf%2F%2F%2F%2F%2F%2F%2F%2F%2F%2FARABGgw2ODk4NjMzNjc2NTMiDOK%2B1szdkDIW2qCWOir2AWUgXPexCFqdj0mQgPjhJEeI4gohVbAODaLY0jClGTrVCL2p3nmFsTfITd5AIAjddelKvBsM666GhipovJx%2F1vHBYKnFan6WHIINL1Is0FqzasvajEhAyZ0U6ZbLjJQiW%2BPe57ajL8ngoQ6IRMgrRCqtL59hEHooCpFklSUuSIIed6xzf543im3ANyIftlADBrkTd%2BgTcgBSeq5E1JV%2BGJUGXSUkPsaicRLOgd%2Fstoxhcl8pyL0U1MVQX11Xr27y%2Bubys%2B1DI3cHPznzBplzlL7FptKWsJSLoVlXQUFFbc7Rx7GSMPbKkvT7gGrxWBJkTHKv1KoRczDNoa%2FPBjqdAe7ZgyP7St5xwTy8CqU25RINO9KYdrsyY9iV7KzdHJuN9D%2BYWnMvindK59sCkJ2KwFY2pr8cuYfJTBIbgPHjvoquHgaClxOsT%2F4Pbb1RPb2pk0m9A%2FDku6EF48G1IidqYEY6BZTnPgTwGNdrwDYJ6PgSPqjBj6p0FlFs%2Fx9mKZNQBgDrVmEBbY6JHz82w%2F9WqMvqiETP1X7voLDDubI%3D&Expires=1777676800"
+    }
+  ],
+  "failed": [
+    {
+      "event_id": "ecb-lagarde-2024-04-press",
+      "error": "yt-dlp failed: WARNING: [youtube] No supported JavaScript runtime could be found. Only deno is enabled by default; to use another runtime add  --js-runtimes RUNTIME[:PATH]  to your command/config. YouTube extraction without a JS runtime has been deprecated, and some formats may be missing. See  https://github.com/yt-dlp/yt-dlp/wiki/EJS  for details on installing one\nERROR: [youtube] 8DtPC2c6Ix8: Video unavailable\n"
+    },
+    {
+      "event_id": "trump-tariffs-2025-statement",
+      "error": "yt-dlp failed: WARNING: [youtube] No supported JavaScript runtime could be found. Only deno is enabled by default; to use another runtime add  --js-runtimes RUNTIME[:PATH]  to your command/config. YouTube extraction without a JS runtime has been deprecated, and some formats may be missing. See  https://github.com/yt-dlp/yt-dlp/wiki/EJS  for details on installing one\nERROR: [youtube] zHCwUQjALok: Video unavailable\n"
+    },
+    {
+      "event_id": "eu-commission-ai-act-2024",
+      "error": "yt-dlp failed: WARNING: [youtube] No supported JavaScript runtime could be found. Only deno is enabled by default; to use another runtime add  --js-runtimes RUNTIME[:PATH]  to your command/config. YouTube extraction without a JS runtime has been deprecated, and some formats may be missing. See  https://github.com/yt-dlp/yt-dlp/wiki/EJS  for details on installing one\nERROR: [youtube] z8EeGqZc1jM: Video unavailable\n"
+    }
+  ]
+}

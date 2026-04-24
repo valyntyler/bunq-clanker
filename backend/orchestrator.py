@@ -17,6 +17,7 @@ from backend.analyzers.chart_vision import analyze_chart
 from backend.analyzers.consumer_panel import analyze_consumer_panel
 from backend.analyzers.fundamentals import analyze_fundamentals
 from backend.analyzers.geopolitical import analyze_geopolitical
+from backend.analyzers.geopolitical_video import analyze_geopolitical_video
 from backend.analyzers.news_sentiment import analyze_news
 from backend.analyzers.synthesizer import synthesize
 from backend.models import (
@@ -112,13 +113,47 @@ def _safe_news(ticker: str, company_name: str | None = None) -> Section | None:
 def _safe_geopolitical(
     ticker: str, company_name: str | None = None, sector: str | None = None
 ) -> list[GeopoliticalOverlay]:
+    """Run BOTH the text-RSS geopolitical analyzer (broad coverage, live) AND
+    the video-clip analyzer (richer multimodal — transcript + frames + prosody),
+    merge by event_id, cap at top 5 by relevance.
+    """
+    text_overlays: list[GeopoliticalOverlay] = []
+    video_overlays: list[GeopoliticalOverlay] = []
     try:
-        return analyze_geopolitical(
+        text_overlays = analyze_geopolitical(
             ticker=ticker, company_name=company_name, sector=sector
         )
     except Exception:  # noqa: BLE001
-        log.exception("geopolitical failed")
-        return []
+        log.exception("text-geopolitical failed")
+    try:
+        video_overlays = asyncio.run(
+            analyze_geopolitical_video(
+                ticker=ticker, company_name=company_name, sector=sector
+            )
+        )
+    except RuntimeError:
+        # already inside a running loop — fall back to a fresh thread
+        try:
+            video_overlays = asyncio.new_event_loop().run_until_complete(
+                analyze_geopolitical_video(
+                    ticker=ticker, company_name=company_name, sector=sector
+                )
+            )
+        except Exception:  # noqa: BLE001
+            log.exception("video-geopolitical failed (loop fallback)")
+    except Exception:  # noqa: BLE001
+        log.exception("video-geopolitical failed")
+
+    # Merge: video wins on ties (richer media)
+    by_id: dict[str, GeopoliticalOverlay] = {}
+    for o in text_overlays + video_overlays:
+        by_id[o.event_id] = o
+    merged = sorted(
+        by_id.values(),
+        key=lambda o: o.relevance * (1 + o.impact_magnitude),
+        reverse=True,
+    )
+    return merged[:5]
 
 
 async def analyze_async(
