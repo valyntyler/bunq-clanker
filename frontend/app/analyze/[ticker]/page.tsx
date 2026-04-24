@@ -3,6 +3,7 @@
 import { useParams, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  resynthesize,
   streamAnalyze,
   type AnalyzeEvent,
   type BunqSpendingOverlay,
@@ -53,6 +54,7 @@ export default function AnalyzePage() {
   const [evidenceOpen, setEvidenceOpen] = useState(false);
   const [userSources, setUserSources] = useState<UserSource[]>([]);
   const [geoOverlays, setGeoOverlays] = useState<GeopoliticalOverlay[]>([]);
+  const [resynthing, setResynthing] = useState(false);
   const startedAt = useRef<number>(0);
 
   useEffect(() => {
@@ -180,7 +182,16 @@ export default function AnalyzePage() {
         </div>
       )}
 
-      {report && <VerdictBanner report={report} />}
+      {report && (
+        <div className="relative">
+          <VerdictBanner report={report} />
+          {resynthing && (
+            <div className="absolute right-4 top-4 rounded-md bg-black/60 px-2 py-1 text-[10px] font-mono uppercase tracking-wider text-emerald-300 backdrop-blur">
+              ⟳ re-synthesizing
+            </div>
+          )}
+        </div>
+      )}
 
       {(panel || bunqSpending) && (
         <div className="grid gap-4 md:grid-cols-2">
@@ -338,7 +349,34 @@ export default function AnalyzePage() {
         companyName={report?.company_name}
         open={evidenceOpen}
         onClose={() => setEvidenceOpen(false)}
-        onAdded={(src) => setUserSources((prev) => [...prev, src])}
+        onAdded={(src) => {
+          const nextSources = [...userSources, src];
+          setUserSources(nextSources);
+          if (!report) return;
+          setResynthing(true);
+          const log = (s: string) =>
+            setLines((prev) => [...prev, `[${ts()}] ${s}`]);
+          log(`+ user-source ${src.source_id} (${src.user_tag}, score ${src.score >= 0 ? "+" : ""}${src.score.toFixed(2)})`);
+          log("⟳ re-synthesizing with new evidence…");
+          resynthesize({
+            ticker: report.ticker,
+            company_name: report.company_name,
+            sections: report.sections,
+            consumer_panel_forecast: report.consumer_panel_forecast,
+            bunq_spending_overlay: report.bunq_spending_overlay,
+            geopolitical_overlays: geoOverlays,
+            user_sources: nextSources,
+            location_context: report.location_context,
+          })
+            .then((r) => {
+              setReport(r);
+              log(
+                `★ verdict=${r.verdict} conf=${r.confidence.toFixed(2)} (re-synth)`
+              );
+            })
+            .catch((e) => log(`re-synth error: ${(e as Error).message}`))
+            .finally(() => setResynthing(false));
+        }}
       />
     </main>
   );

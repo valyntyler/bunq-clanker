@@ -142,6 +142,22 @@ export async function nearbyTickers(
   );
 }
 
+export interface ValidateTickerResponse {
+  ok: boolean;
+  name: string | null;
+  ticker: string;
+}
+
+export async function validateTicker(
+  ticker: string
+): Promise<ValidateTickerResponse> {
+  return j<ValidateTickerResponse>(
+    await fetch(
+      `${BACKEND_URL}/validate-ticker/${encodeURIComponent(ticker)}`
+    )
+  );
+}
+
 export async function invest(
   ticker: string,
   amountEur: number
@@ -181,6 +197,29 @@ export async function submitEvidence(
 ): Promise<UserSource> {
   return j<UserSource>(
     await fetch(`${BACKEND_URL}/evidence`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(req),
+    })
+  );
+}
+
+export interface ResynthesizeRequest {
+  ticker: string;
+  company_name: string;
+  sections: Record<string, Section>;
+  consumer_panel_forecast?: ConsumerPanelForecast | null;
+  bunq_spending_overlay?: BunqSpendingOverlay | null;
+  geopolitical_overlays?: GeopoliticalOverlay[];
+  user_sources?: UserSource[];
+  location_context?: Report["location_context"];
+}
+
+export async function resynthesize(
+  req: ResynthesizeRequest
+): Promise<Report> {
+  return j<Report>(
+    await fetch(`${BACKEND_URL}/resynthesize`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(req),

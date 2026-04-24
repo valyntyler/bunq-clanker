@@ -136,6 +136,21 @@ class EvidenceRequest(BaseModel):
     user_tag: Literal["supporting", "contradicting", "neutral"] = "neutral"
 
 
+class ResynthesizeRequest(BaseModel):
+    """Re-run the synthesizer with the original module outputs + a new
+    user_sources list, without paying for a full pipeline re-run.
+    """
+
+    ticker: str
+    company_name: str
+    sections: dict[str, Section]
+    consumer_panel_forecast: ConsumerPanelForecast | None = None
+    bunq_spending_overlay: BunqSpendingOverlay | None = None
+    geopolitical_overlays: list[GeopoliticalOverlay] = []
+    user_sources: list[UserSource] = []
+    location_context: LocationContext = LocationContext()
+
+
 class InvestRequest(BaseModel):
     ticker: str
     amount_eur: float = Field(gt=0)

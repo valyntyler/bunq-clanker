@@ -135,3 +135,29 @@ def latest_price(symbol: str) -> float | None:
         return float(hist["Close"].iloc[-1])
     except Exception:
         return None
+
+
+def validate_ticker(symbol: str) -> tuple[bool, str | None]:
+    """Cheap existence check via yfinance. Returns (is_valid, name_if_valid).
+
+    yfinance silently returns empty info + 0-row history for bogus symbols
+    (and logs an HTTP 404 stderr line). We treat 'no name AND no price AND no
+    history' as 'not a real listed equity'.
+    """
+    try:
+        t = _ticker(symbol)
+        info = t.info or {}
+        name = info.get("longName") or info.get("shortName")
+        price = info.get("currentPrice") or info.get("regularMarketPrice")
+        if name and price:
+            return True, name
+        # Fallback — some illiquid tickers have no info but do have price history
+        try:
+            hist = t.history(period="5d")
+            if not hist.empty:
+                return True, name or symbol
+        except Exception:
+            pass
+        return False, None
+    except Exception:
+        return False, None

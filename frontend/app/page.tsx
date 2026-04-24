@@ -3,14 +3,38 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { NearbyTickersPicker } from "@/components/NearbyTickers";
+import { validateTicker } from "@/lib/api";
 
 export default function Landing() {
   const router = useRouter();
   const [typed, setTyped] = useState("");
+  const [checking, setChecking] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   function go(ticker: string, coords?: { lat: number; lng: number }) {
     const q = coords ? `?lat=${coords.lat}&lng=${coords.lng}` : "";
     router.push(`/analyze/${encodeURIComponent(ticker)}${q}`);
+  }
+
+  async function submitTyped() {
+    const t = typed.trim().toUpperCase();
+    if (!t) return;
+    setChecking(true);
+    setError(null);
+    try {
+      const r = await validateTicker(t);
+      if (!r.ok) {
+        setError(
+          `"${t}" doesn't look like a real listed ticker. Try AAPL, NVDA, HEIA.AS, ASML.AS, …`
+        );
+        return;
+      }
+      go(t);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setChecking(false);
+    }
   }
 
   return (
@@ -32,7 +56,7 @@ export default function Landing() {
         <form
           onSubmit={(e) => {
             e.preventDefault();
-            if (typed.trim()) go(typed.trim().toUpperCase());
+            void submitTyped();
           }}
           className="space-y-3"
         >
@@ -42,18 +66,28 @@ export default function Landing() {
           <div className="flex gap-2">
             <input
               value={typed}
-              onChange={(e) => setTyped(e.target.value)}
+              onChange={(e) => {
+                setTyped(e.target.value);
+                if (error) setError(null);
+              }}
               placeholder="HEIA.AS, ASML, AAPL…"
               className="flex-1 rounded-lg border border-zinc-800 bg-zinc-900 px-4 py-3 font-mono outline-none focus:border-zinc-600"
               autoFocus
+              disabled={checking}
             />
             <button
               type="submit"
-              className="rounded-lg bg-emerald-600 px-5 font-semibold text-white hover:bg-emerald-500"
+              disabled={checking || !typed.trim()}
+              className="rounded-lg bg-emerald-600 px-5 font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
             >
-              Analyze
+              {checking ? "Checking…" : "Analyze"}
             </button>
           </div>
+          {error && (
+            <div className="rounded-md bg-rose-950/40 px-3 py-2 text-xs text-rose-300">
+              {error}
+            </div>
+          )}
         </form>
 
         <div className="relative">

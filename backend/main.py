@@ -33,6 +33,7 @@ from backend.analyzers.consumer_panel import analyze_consumer_panel
 from backend.analyzers.user_text import analyze_user_text
 from backend.integrations import alpaca as alpaca_i
 from backend.integrations import bunq as bunq_i
+from backend.analyzers.synthesizer import synthesize
 from backend.models import (
     AnalyzeRequest,
     ConsumerPanelForecast,
@@ -41,10 +42,12 @@ from backend.models import (
     InvestRequest,
     NearbyTicker,
     Report,
+    ResynthesizeRequest,
     UserSource,
 )
 from backend.orchestrator import analyze_async, analyze_stream
 from backend.scrapers.user_evidence import fetch_url, passthrough_text
+from backend.scrapers.yahoo import validate_ticker
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("prospectus")
@@ -102,11 +105,19 @@ async def analyze_stream_route(req: AnalyzeRequest) -> StreamingResponse:
     """
     coords = (req.lat, req.lng) if req.lat is not None and req.lng is not None else None
     location_label = _nearest_label(coords) if coords else None
+    ticker_upper = req.ticker.upper()
+
+    # Validate the ticker before kicking off any modules so we fail fast
+    # rather than fabricating analysis on a non-existent symbol.
+    valid, _name = await asyncio.to_thread(validate_ticker, ticker_upper)
 
     async def event_gen():
+        if not valid:
+            yield f"data: {_json.dumps({'event': 'error', 'message': f'Unknown ticker: {ticker_upper}. Try a real listed symbol (e.g. HEIA.AS, AAPL, NVDA).'})}\n\n"
+            return
         try:
             async for ev in analyze_stream(
-                req.ticker, coords=coords, location_label=location_label
+                ticker_upper, coords=coords, location_label=location_label
             ):
                 yield f"data: {_json.dumps(ev)}\n\n"
         except Exception as e:  # noqa: BLE001
@@ -121,6 +132,44 @@ async def analyze_stream_route(req: AnalyzeRequest) -> StreamingResponse:
             "x-accel-buffering": "no",  # disable nginx-style buffering
             "connection": "keep-alive",
         },
+    )
+
+
+@app.post("/resynthesize", response_model=Report)
+async def resynthesize(req: ResynthesizeRequest) -> Report:
+    """Re-run the synthesizer with the original modules + new user_sources.
+    Returns a fresh Report with updated verdict/confidence/one_liner/conflicts.
+    Skips all the expensive scraping; only the synthesizer Claude call fires.
+    """
+    synth = await asyncio.to_thread(
+        synthesize,
+        ticker=req.ticker,
+        company_name=req.company_name,
+        sections=req.sections,
+        consumer_panel=req.consumer_panel_forecast,
+        bunq_spending=req.bunq_spending_overlay,
+        geopolitical_overlays=req.geopolitical_overlays,
+        user_sources=req.user_sources,
+    )
+    from datetime import datetime, timezone
+
+    return Report(
+        ticker=req.ticker,
+        company_name=req.company_name,
+        generated_at=datetime.now(timezone.utc).isoformat(),
+        verdict=synth["verdict"],
+        confidence=float(synth["confidence"]),
+        position_size_pct=float(synth["position_size_pct"]),
+        one_liner=synth["one_liner"],
+        sections=req.sections,
+        consumer_panel_forecast=req.consumer_panel_forecast,
+        bunq_spending_overlay=req.bunq_spending_overlay,
+        geopolitical_overlays=req.geopolitical_overlays,
+        user_sources=req.user_sources,
+        location_context=req.location_context,
+        risks=synth.get("risks", []),
+        conflicts=synth.get("conflicts", []),
+        data_gaps=synth.get("data_gaps", []),
     )
 
 
@@ -164,10 +213,17 @@ async def analyze(req: AnalyzeRequest) -> Report:
     parallel, then synthesized by Claude into a final verdict.
     """
     log.info("analyze: ticker=%s lat=%s lng=%s", req.ticker, req.lat, req.lng)
+    ticker_upper = req.ticker.upper()
+    valid, _name = await asyncio.to_thread(validate_ticker, ticker_upper)
+    if not valid:
+        raise HTTPException(
+            404,
+            f"Unknown ticker: {ticker_upper}. Try a real listed symbol (e.g. HEIA.AS, AAPL, NVDA).",
+        )
     coords = (req.lat, req.lng) if req.lat is not None and req.lng is not None else None
     # Location label comes from the nearest HQ hit if coords are present.
     location_label = _nearest_label(coords) if coords else None
-    return await analyze_async(req.ticker, coords=coords, location_label=location_label)
+    return await analyze_async(ticker_upper, coords=coords, location_label=location_label)
 
 
 def _nearest_label(coords: tuple[float, float] | None) -> str | None:
@@ -212,6 +268,15 @@ def panel(ticker: str) -> ConsumerPanelForecast:
         return analyze_consumer_panel(ticker.upper())
     except KeyError:
         raise HTTPException(404, f"no panel data for ticker {ticker}")
+
+
+@app.get("/validate-ticker/{ticker}")
+async def validate_ticker_route(ticker: str) -> dict:
+    """Cheap existence check used by the frontend before kicking off a full
+    /analyze. Returns {ok: bool, name: str | None}.
+    """
+    valid, name = await asyncio.to_thread(validate_ticker, ticker.upper())
+    return {"ok": valid, "name": name, "ticker": ticker.upper()}
 
 
 FX_EUR_USD = 1.08  # stub rate — we don't need a live FX feed for a paper-trade demo
