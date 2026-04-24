@@ -186,6 +186,11 @@ async def evidence(req: EvidenceRequest) -> UserSource:
     elif req.source_type == "text":
         if not req.text:
             raise HTTPException(400, "text is required for source_type=text")
+        if len(req.text.strip()) < 30:
+            raise HTTPException(
+                400,
+                "text is too short to analyze — paste at least a sentence or two (≥30 chars).",
+            )
         extracted = passthrough_text(req.text)
     else:
         raise HTTPException(400, f"unsupported source_type {req.source_type}")

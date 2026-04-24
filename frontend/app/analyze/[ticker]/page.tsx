@@ -159,14 +159,23 @@ export default function AnalyzePage() {
         <div className="flex gap-2">
           <button
             onClick={() => setEvidenceOpen(true)}
-            className="rounded-lg border border-violet-600 bg-violet-950/40 px-4 py-2 text-sm font-semibold text-violet-200 hover:bg-violet-900/50"
+            disabled={pending || resynthing || !report}
+            className="rounded-lg border border-violet-600 bg-violet-950/40 px-4 py-2 text-sm font-semibold text-violet-200 hover:bg-violet-900/50 disabled:cursor-not-allowed disabled:opacity-40"
+            title={
+              pending
+                ? "Wait for the initial pipeline to finish"
+                : resynthing
+                  ? "Re-synthesizing previous evidence"
+                  : ""
+            }
           >
             + Add evidence
           </button>
           {report && (
             <button
               onClick={() => setInvestOpen(true)}
-              className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500"
+              disabled={resynthing}
+              className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
             >
               Invest →
             </button>
@@ -177,8 +186,17 @@ export default function AnalyzePage() {
       <TerminalLog lines={lines} />
 
       {err && (
-        <div className="rounded-lg bg-rose-950/50 p-4 text-sm text-rose-300">
-          {err}
+        <div className="rounded-xl border border-rose-700 bg-rose-950/40 p-6 text-rose-100">
+          <div className="text-xs font-mono uppercase tracking-wider text-rose-400">
+            analyze failed
+          </div>
+          <p className="mt-1 text-sm">{err}</p>
+          <a
+            href="/"
+            className="mt-4 inline-block rounded-lg bg-rose-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-rose-600"
+          >
+            ← back to landing
+          </a>
         </div>
       )}
 
@@ -199,6 +217,18 @@ export default function AnalyzePage() {
           {bunqSpending && (
             <BunqSpendingCard overlay={bunqSpending} ticker={ticker} />
           )}
+        </div>
+      )}
+
+      {report && !panel && !bunqSpending && (
+        <div className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-4 text-xs text-zinc-400">
+          <div className="mb-1 font-mono uppercase tracking-wider text-zinc-500">
+            Coverage note
+          </div>
+          {report.ticker} isn't in our 25-stock demo seed, so the Bunq panel
+          forecast and personal spending overlays are skipped. Fundamentals,
+          news, chart vision, and geopolitical overlays still run on real
+          data.
         </div>
       )}
 
