@@ -6,9 +6,9 @@ const TREND_ARROW = {
   declining: "↘",
 } as const;
 const TREND_COLOR = {
-  accelerating: "text-emerald-400",
-  flat: "text-zinc-300",
-  declining: "text-rose-400",
+  accelerating: "text-[var(--bunq-green)]",
+  flat: "text-[var(--bunq-muted)]",
+  declining: "text-[var(--bunq-bad)]",
 } as const;
 
 export function BunqSpendingCard({
@@ -19,39 +19,74 @@ export function BunqSpendingCard({
   ticker: string;
 }) {
   return (
-    <div className="rounded-xl border border-fuchsia-900/50 bg-gradient-to-br from-fuchsia-950/60 to-zinc-950 p-6">
-      <div className="flex items-center gap-2 text-xs font-mono uppercase tracking-wider text-fuchsia-300">
-        <span className="rounded bg-fuchsia-900/60 px-2 py-0.5">your bunq</span>
-        <span>personal conviction · {ticker}</span>
+    <div
+      className="relative overflow-hidden rounded-3xl border p-6"
+      style={{
+        background:
+          "linear-gradient(150deg, #0c1308, var(--bunq-surface) 70%)",
+        borderColor: "var(--bunq-border)",
+      }}
+    >
+      {/* Bunq-style top stripe */}
+      <div className="absolute inset-x-0 top-0 h-[3px] bg-[var(--bunq-green)]" />
+
+      <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--bunq-green)]">
+        <BunqMark />
+        <span className="text-[var(--bunq-muted)]">
+          your wallet · personal conviction · {ticker}
+        </span>
       </div>
-      <div className="mt-3 flex items-end justify-between gap-4">
+
+      <div className="mt-4 flex items-end justify-between gap-4">
         <div>
-          <div className="text-sm text-zinc-400">12-month spend</div>
+          <div className="text-xs text-[var(--bunq-muted)]">
+            Spend at {ticker} venues · 12 months
+          </div>
           <div className="mt-1 flex items-baseline gap-2">
-            <span className="text-4xl font-black tracking-tight text-zinc-100">
+            <span className="bunq-numeral text-5xl font-black text-[var(--bunq-text)]">
               €{overlay.total_spent_12m_eur.toFixed(0)}
             </span>
-            <span className={`text-2xl ${TREND_COLOR[overlay.trend]}`}>
+            <span className={`text-3xl ${TREND_COLOR[overlay.trend]}`}>
               {TREND_ARROW[overlay.trend]}
             </span>
           </div>
-          <div className="mt-1 text-xs text-zinc-500">
+          <div className="mt-1 text-[11px] text-[var(--bunq-faint)]">
             {overlay.visit_count} visits · last {overlay.last_visit}
           </div>
         </div>
+
         <div className="text-right">
-          <div className="text-sm text-zinc-400">conviction</div>
-          <div className="text-3xl font-bold text-fuchsia-300">
+          <div className="text-xs text-[var(--bunq-muted)]">conviction</div>
+          <div className="bunq-numeral text-3xl font-black text-[var(--bunq-green)]">
             {Math.round(overlay.personal_conviction_score * 100)}
           </div>
         </div>
       </div>
-      <p className="mt-3 text-sm text-zinc-300">{overlay.summary}</p>
+
+      <p className="mt-4 text-sm leading-relaxed text-[var(--bunq-text)]/85">
+        {overlay.summary}
+      </p>
       {overlay.geo_signal && (
-        <div className="mt-2 text-[11px] font-mono text-zinc-500">
-          geo: {overlay.geo_signal}
+        <div className="mt-2 font-mono text-[11px] text-[var(--bunq-faint)]">
+          geo · {overlay.geo_signal}
         </div>
       )}
     </div>
+  );
+}
+
+/** Tiny inline mark riffing on Bunq's b-monogram. Decorative only. */
+function BunqMark() {
+  return (
+    <span
+      className="inline-flex h-4 w-4 items-center justify-center rounded-full text-[10px] font-black"
+      style={{
+        background: "var(--bunq-green)",
+        color: "#0a0d05",
+      }}
+      aria-hidden
+    >
+      b
+    </span>
   );
 }

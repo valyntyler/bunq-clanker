@@ -1,9 +1,9 @@
 import type { Section } from "@/lib/api";
 
 function scoreColor(score: number) {
-  if (score >= 0.3) return "text-emerald-400";
-  if (score <= -0.3) return "text-rose-400";
-  return "text-amber-300";
+  if (score >= 0.3) return "text-[var(--bunq-green)]";
+  if (score <= -0.3) return "text-[var(--bunq-bad)]";
+  return "text-[var(--bunq-warn)]";
 }
 
 function scoreLabel(score: number) {
@@ -33,43 +33,48 @@ export function SectionCard({
   };
 
   return (
-    <div className="overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900/60">
+    <div
+      className="overflow-hidden rounded-2xl border"
+      style={{
+        background: "var(--bunq-surface)",
+        borderColor: "var(--bunq-border)",
+      }}
+    >
       {extra.image_url && (
-        // chart-vision attaches a presigned S3 URL; show what Claude actually saw.
         <a href={extra.image_url} target="_blank" rel="noopener noreferrer">
           <img
             src={extra.image_url}
             alt={`${name} chart`}
-            className="aspect-[4/3] w-full bg-zinc-950 object-cover"
+            className="aspect-[4/3] w-full bg-black object-cover"
             loading="lazy"
           />
         </a>
       )}
-      <div className="p-4">
+      <div className="p-5">
         <div className="flex items-baseline justify-between">
-          <h3 className="text-sm font-semibold uppercase tracking-wider text-zinc-300">
+          <h3 className="font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--bunq-muted)]">
             {name.replace(/_/g, " ")}
           </h3>
-          <span className={`text-xs font-mono ${scoreColor(section.score)}`}>
+          <span className={`bunq-numeral font-mono text-xs ${scoreColor(section.score)}`}>
             {scoreLabel(section.score)} · {section.score >= 0 ? "+" : ""}
             {section.score.toFixed(2)}
           </span>
         </div>
-        <p className="mt-2 text-sm leading-relaxed text-zinc-200">
+        <p className="mt-2 text-sm leading-relaxed text-[var(--bunq-text)]/90">
           {section.summary}
         </p>
 
         {extra.red_flags && extra.red_flags.length > 0 && (
-          <FlagList color="rose" label="red flags" items={extra.red_flags} />
+          <FlagList variant="bad" label="red flags" items={extra.red_flags} />
         )}
         {extra.green_flags && extra.green_flags.length > 0 && (
-          <FlagList color="emerald" label="green flags" items={extra.green_flags} />
+          <FlagList variant="good" label="green flags" items={extra.green_flags} />
         )}
         {extra.material_events && extra.material_events.length > 0 && (
-          <FlagList color="amber" label="material events" items={extra.material_events} />
+          <FlagList variant="warn" label="material events" items={extra.material_events} />
         )}
         {(extra.support || extra.resistance || extra.technical_verdict) && (
-          <div className="mt-3 flex flex-wrap gap-2 text-[11px] font-mono">
+          <div className="mt-3 flex flex-wrap gap-1.5 font-mono text-[11px]">
             {extra.technical_verdict && (
               <Pill k="verdict" v={extra.technical_verdict} />
             )}
@@ -79,18 +84,26 @@ export function SectionCard({
           </div>
         )}
         {extra.patterns && extra.patterns.length > 0 && (
-          <div className="mt-2 flex flex-wrap gap-1 text-[10px] font-mono text-zinc-500">
+          <div className="mt-2 flex flex-wrap gap-1 font-mono text-[10px] text-[var(--bunq-faint)]">
             {extra.patterns.map((p) => (
-              <span key={p} className="rounded bg-zinc-800 px-1.5 py-0.5">
+              <span
+                key={p}
+                className="rounded-full px-2 py-0.5"
+                style={{ background: "var(--bunq-surface-2)" }}
+              >
                 {p}
               </span>
             ))}
           </div>
         )}
         {section.sources && section.sources.length > 0 && (
-          <div className="mt-3 flex flex-wrap gap-1 text-[10px] font-mono text-zinc-500">
+          <div className="mt-3 flex flex-wrap gap-1 font-mono text-[10px] text-[var(--bunq-faint)]">
             {section.sources.map((s) => (
-              <span key={s} className="rounded bg-zinc-800 px-1.5 py-0.5">
+              <span
+                key={s}
+                className="rounded-full px-2 py-0.5"
+                style={{ background: "var(--bunq-surface-2)" }}
+              >
                 {s}
               </span>
             ))}
@@ -102,25 +115,43 @@ export function SectionCard({
 }
 
 function FlagList({
-  color,
+  variant,
   label,
   items,
 }: {
-  color: "rose" | "emerald" | "amber";
+  variant: "bad" | "good" | "warn";
   label: string;
   items: string[];
 }) {
-  const wrap = {
-    rose: "border-rose-900/40 bg-rose-950/20 text-rose-300",
-    emerald: "border-emerald-900/40 bg-emerald-950/20 text-emerald-300",
-    amber: "border-amber-900/40 bg-amber-950/20 text-amber-300",
-  }[color];
+  const styles = {
+    bad: {
+      bg: "rgba(255, 91, 107, 0.06)",
+      border: "rgba(255, 91, 107, 0.20)",
+      header: "var(--bunq-bad)",
+    },
+    good: {
+      bg: "rgba(181, 255, 0, 0.06)",
+      border: "rgba(181, 255, 0, 0.22)",
+      header: "var(--bunq-green)",
+    },
+    warn: {
+      bg: "rgba(255, 183, 77, 0.06)",
+      border: "rgba(255, 183, 77, 0.22)",
+      header: "var(--bunq-warn)",
+    },
+  }[variant];
   return (
-    <div className={`mt-3 rounded border ${wrap} p-2`}>
-      <div className="text-[9px] font-mono uppercase tracking-wider opacity-80">
+    <div
+      className="mt-3 rounded-xl border p-2.5"
+      style={{ background: styles.bg, borderColor: styles.border }}
+    >
+      <div
+        className="font-mono text-[9px] font-semibold uppercase tracking-[0.16em]"
+        style={{ color: styles.header }}
+      >
         {label}
       </div>
-      <ul className="mt-1 space-y-0.5 text-[11px] leading-snug">
+      <ul className="mt-1 space-y-0.5 text-[11px] leading-snug text-[var(--bunq-text)]/85">
         {items.map((it, i) => (
           <li key={i}>· {it}</li>
         ))}
@@ -131,8 +162,15 @@ function FlagList({
 
 function Pill({ k, v }: { k: string; v: string }) {
   return (
-    <span className="rounded bg-zinc-800 px-2 py-0.5 text-zinc-300">
-      <span className="text-zinc-500">{k}</span> {v}
+    <span
+      className="rounded-full px-2.5 py-0.5"
+      style={{
+        background: "var(--bunq-surface-2)",
+        color: "var(--bunq-text)",
+      }}
+    >
+      <span className="text-[var(--bunq-faint)]">{k} </span>
+      {v}
     </span>
   );
 }

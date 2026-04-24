@@ -52,6 +52,7 @@ from backend.models import (
     UserSource,
 )
 from backend.orchestrator import analyze_async, analyze_stream
+from backend.scrapers.compress import compress_audio, compress_image, compress_video
 from backend.scrapers.user_evidence import fetch_url, passthrough_text
 from backend.scrapers.yahoo import validate_ticker
 
@@ -277,41 +278,61 @@ async def evidence_upload(
         user_tag = "neutral"
 
     if source_type == "image":
+        compressed, ctype, stats = await asyncio.to_thread(compress_image, content)
+        log.info(
+            "compress image %s: %d→%d bytes (%.1f%%) in %.1fs [%s]",
+            file.filename, stats["in_bytes"], stats["out_bytes"],
+            100 * stats["ratio"], stats["elapsed_s"], stats["format"],
+        )
         return await asyncio.to_thread(
             analyze_user_image,
             ticker=ticker,
             company_name=company_name,
-            image_bytes=content,
-            content_type=file.content_type,
+            image_bytes=compressed,
+            content_type=ctype,
             user_note=user_note,
             user_tag=user_tag,  # type: ignore[arg-type]
             filename=file.filename,
         )
     if source_type == "video":
+        compressed, ctype, stats = await asyncio.to_thread(compress_video, content)
+        log.info(
+            "compress video %s: %d→%d bytes (%.1f%%) in %.1fs [%s]",
+            file.filename, stats["in_bytes"], stats["out_bytes"],
+            100 * stats["ratio"], stats["elapsed_s"], stats["format"],
+        )
         return await asyncio.to_thread(
             analyze_user_video,
             ticker=ticker,
             company_name=company_name,
-            video_bytes=content,
-            content_type=file.content_type,
+            video_bytes=compressed,
+            content_type=ctype,
             user_note=user_note,
             user_tag=user_tag,  # type: ignore[arg-type]
             filename=file.filename,
             is_audio_only=False,
         )
     if source_type == "audio":
+        compressed, ctype, stats = await asyncio.to_thread(compress_audio, content)
+        log.info(
+            "compress audio %s: %d→%d bytes (%.1f%%) in %.1fs [%s]",
+            file.filename, stats["in_bytes"], stats["out_bytes"],
+            100 * stats["ratio"], stats["elapsed_s"], stats["format"],
+        )
         return await asyncio.to_thread(
             analyze_user_video,
             ticker=ticker,
             company_name=company_name,
-            video_bytes=content,
-            content_type=file.content_type,
+            video_bytes=compressed,
+            content_type=ctype,
             user_note=user_note,
             user_tag=user_tag,  # type: ignore[arg-type]
             filename=file.filename,
             is_audio_only=True,
         )
     if source_type == "pdf":
+        # PDFs are already well-compressed; skip ffmpeg/PIL but log size
+        log.info("pdf %s: %d bytes (no compression)", file.filename, len(content))
         return await asyncio.to_thread(
             analyze_user_pdf,
             ticker=ticker,

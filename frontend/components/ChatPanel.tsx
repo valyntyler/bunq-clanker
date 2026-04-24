@@ -60,25 +60,40 @@ export function ChatPanel({ report }: { report: Report }) {
   }
 
   return (
-    <section className="rounded-xl border border-emerald-900/40 bg-zinc-950">
-      <header className="flex items-center justify-between border-b border-emerald-900/30 px-4 py-2">
-        <div className="font-mono text-[10px] uppercase tracking-wider text-emerald-400">
+    <section
+      className="rounded-3xl border"
+      style={{
+        background: "var(--bunq-surface)",
+        borderColor: "var(--bunq-border)",
+      }}
+    >
+      <header
+        className="flex items-center justify-between rounded-t-3xl border-b px-5 py-3"
+        style={{ borderColor: "var(--bunq-border)" }}
+      >
+        <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--bunq-green)]">
+          <span
+            className="inline-flex h-4 w-4 items-center justify-center rounded-full text-[9px] font-black"
+            style={{ background: "var(--bunq-green)", color: "#0a0d05" }}
+          >
+            b
+          </span>
           chat with the analyst · {report.ticker}
         </div>
         {history.length > 0 && (
           <button
             onClick={() => setHistory([])}
-            className="text-[10px] font-mono text-zinc-500 hover:text-zinc-300"
+            className="font-mono text-[10px] text-[var(--bunq-faint)] hover:text-[var(--bunq-muted)]"
           >
             reset
           </button>
         )}
       </header>
 
-      <div className="max-h-[55vh] space-y-3 overflow-y-auto p-4">
+      <div className="max-h-[55vh] space-y-3 overflow-y-auto p-5">
         {history.length === 0 && !streaming && (
           <div>
-            <p className="text-xs text-zinc-400">
+            <p className="text-xs text-[var(--bunq-muted)]">
               Ask about the verdict, the panel data, or what would change the
               call. Replies are grounded in the modules above.
             </p>
@@ -87,7 +102,12 @@ export function ChatPanel({ report }: { report: Report }) {
                 <button
                   key={q}
                   onClick={() => send(q)}
-                  className="rounded-full border border-emerald-900/50 bg-emerald-950/30 px-3 py-1 text-[11px] text-emerald-200 hover:bg-emerald-900/40"
+                  className="rounded-full border px-3 py-1 text-[11px] hover:bg-[var(--bunq-surface-2)]"
+                  style={{
+                    borderColor: "var(--bunq-border-strong)",
+                    background: "var(--bunq-surface-2)",
+                    color: "var(--bunq-text)",
+                  }}
                 >
                   {q}
                 </button>
@@ -114,7 +134,8 @@ export function ChatPanel({ report }: { report: Report }) {
           e.preventDefault();
           void send(input);
         }}
-        className="flex gap-2 border-t border-emerald-900/30 p-3"
+        className="flex gap-2 rounded-b-3xl border-t p-3"
+        style={{ borderColor: "var(--bunq-border)" }}
       >
         <input
           value={input}
@@ -125,12 +146,18 @@ export function ChatPanel({ report }: { report: Report }) {
               : "Ask anything about the analysis"
           }
           disabled={streaming}
-          className="flex-1 rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm outline-none focus:border-emerald-700 disabled:opacity-50"
+          className="flex-1 rounded-full px-4 py-2 text-sm outline-none disabled:opacity-50"
+          style={{
+            background: "var(--bunq-surface-2)",
+            border: "1px solid var(--bunq-border-strong)",
+            color: "var(--bunq-text)",
+          }}
         />
         <button
           type="submit"
           disabled={streaming || !input.trim()}
-          className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
+          className="bunq-glow rounded-full px-5 text-sm font-semibold disabled:opacity-50"
+          style={{ background: "var(--bunq-green)", color: "#0a0d05" }}
         >
           Send
         </button>
@@ -148,19 +175,25 @@ function Bubble({
 }) {
   const isUser = turn.role === "user";
   return (
-    <div
-      className={`flex ${isUser ? "justify-end" : "justify-start"}`}
-    >
+    <div className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
       <div
-        className={`max-w-[85%] whitespace-pre-wrap rounded-2xl px-4 py-2 text-sm leading-relaxed ${
+        className="max-w-[85%] whitespace-pre-wrap rounded-2xl px-4 py-2 text-sm leading-relaxed"
+        style={
           isUser
-            ? "bg-emerald-700 text-white"
-            : "border border-zinc-800 bg-zinc-900 text-zinc-100"
-        }`}
+            ? { background: "var(--bunq-green)", color: "#0a0d05" }
+            : {
+                border: "1px solid var(--bunq-border)",
+                background: "var(--bunq-surface-2)",
+                color: "var(--bunq-text)",
+              }
+        }
       >
         {turn.content}
         {streaming && (
-          <span className="ml-1 inline-block h-3 w-2 animate-pulse bg-emerald-400 align-middle" />
+          <span
+            className="ml-1 inline-block h-3 w-1.5 animate-pulse align-middle"
+            style={{ background: "var(--bunq-green)" }}
+          />
         )}
       </div>
     </div>

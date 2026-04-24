@@ -1,26 +1,59 @@
 @import "tailwindcss";
 
+/* ── Bunq-inspired palette ──────────────────────────────────────────
+   Dark surface + a single signature lime-green accent. Used app-wide
+   for primary actions, positive verdicts, and account-style numerals.
+   Keep amber for HOLD and red for AVOID so the verdict semantics still
+   read at a glance.
+*/
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* surfaces */
+  --bunq-bg:        #08080a;
+  --bunq-surface:   #11121a;
+  --bunq-surface-2: #161820;
+  --bunq-border:    #20232c;
+  --bunq-border-strong: #30343f;
+  /* type */
+  --bunq-text:      #f5f7fa;
+  --bunq-muted:     #8a8f9b;
+  --bunq-faint:     #5a5e6c;
+  /* accent (Bunq-style lime, used sparingly) */
+  --bunq-green:     #b5ff00;
+  --bunq-green-soft: #243d04;
+  --bunq-green-deep: #6cb800;
+  /* state */
+  --bunq-warn:      #ffb74d;
+  --bunq-warn-soft: #3d2e10;
+  --bunq-bad:       #ff5b6b;
+  --bunq-bad-soft:  #3a141a;
+  --bunq-info:      #5ac8fa;
+  --bunq-info-soft: #11293a;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-background: var(--bunq-bg);
+  --color-foreground: var(--bunq-text);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html, body {
+  background: var(--bunq-bg);
+  color: var(--bunq-text);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* Numerals always look like the Bunq app: tabular figures + tight tracking. */
+.bunq-numeral {
+  font-feature-settings: "tnum" 1;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+/* Subtle vertical glow under the accent — used on primary CTA. */
+.bunq-glow {
+  box-shadow:
+    0 0 0 1px rgba(181, 255, 0, 0.18),
+    0 14px 30px -8px rgba(181, 255, 0, 0.20);
 }

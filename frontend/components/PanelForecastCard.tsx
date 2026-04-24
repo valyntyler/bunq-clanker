@@ -6,9 +6,9 @@ const DIR_ARROW: Record<string, string> = {
   miss: "↓",
 };
 const DIR_COLOR: Record<string, string> = {
-  beat: "text-emerald-400",
-  "in-line": "text-zinc-300",
-  miss: "text-rose-400",
+  beat: "text-[var(--bunq-green)]",
+  "in-line": "text-[var(--bunq-text)]",
+  miss: "text-[var(--bunq-bad)]",
 };
 
 export function PanelForecastCard({
@@ -20,44 +20,79 @@ export function PanelForecastCard({
 }) {
   const dir = forecast.next_quarter.revenue_direction;
   return (
-    <div className="rounded-xl border border-sky-800/50 bg-gradient-to-br from-sky-950/80 to-zinc-950 p-6 shadow-2xl">
-      <div className="flex items-center gap-2 text-xs font-mono uppercase tracking-wider text-sky-300">
-        <span className="rounded bg-sky-900/60 px-2 py-0.5">alt-data</span>
-        <span>Bunq consumer panel · {ticker}</span>
+    <div
+      className="rounded-3xl border p-6"
+      style={{
+        background:
+          "linear-gradient(160deg, rgba(181,255,0,0.10), var(--bunq-surface))",
+        borderColor: "var(--bunq-border)",
+      }}
+    >
+      <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--bunq-green)]">
+        <span className="rounded-full bg-[var(--bunq-green-soft)] px-2 py-0.5">
+          alt-data
+        </span>
+        <span className="text-[var(--bunq-muted)]">
+          Bunq panel · {ticker}
+        </span>
       </div>
-      <div className="mt-3 flex items-end justify-between gap-4">
+
+      <div className="mt-4 flex items-end justify-between gap-4">
         <div>
-          <div className="text-sm text-zinc-400">Q+1 revenue forecast</div>
+          <div className="text-xs text-[var(--bunq-muted)]">
+            Q+1 revenue forecast
+          </div>
           <div
-            className={`mt-1 text-5xl font-black tracking-tight ${DIR_COLOR[dir]}`}
+            className={`mt-1 bunq-numeral text-5xl font-black tracking-tight ${DIR_COLOR[dir]}`}
           >
             {DIR_ARROW[dir]} {forecast.next_quarter.vs_consensus_pct}
           </div>
-          <div className="mt-1 text-xs text-zinc-500">
-            confidence {Math.round(forecast.next_quarter.confidence * 100)}%
+          <div className="mt-1 text-[11px] text-[var(--bunq-faint)]">
+            confidence · {Math.round(forecast.next_quarter.confidence * 100)}%
           </div>
         </div>
+
         <div className="text-right text-sm">
-          <Stat label="YoY spend" value={`${forecast.yoy_change_pct.toFixed(1)}%`} accent={forecast.yoy_change_pct >= 0} />
-          <Stat label="QoQ spend" value={`${forecast.qoq_change_pct.toFixed(1)}%`} accent={forecast.qoq_change_pct >= 0} />
-          <Stat label="panel N" value={forecast.panel_size_n.toLocaleString()} />
           <Stat
-            label="hist. correlation"
+            label="YoY spend"
+            value={`${forecast.yoy_change_pct >= 0 ? "+" : ""}${forecast.yoy_change_pct.toFixed(1)}%`}
+            accent={forecast.yoy_change_pct >= 0}
+          />
+          <Stat
+            label="QoQ spend"
+            value={`${forecast.qoq_change_pct >= 0 ? "+" : ""}${forecast.qoq_change_pct.toFixed(1)}%`}
+            accent={forecast.qoq_change_pct >= 0}
+          />
+          <Stat
+            label="panel N"
+            value={forecast.panel_size_n.toLocaleString()}
+          />
+          <Stat
+            label="hist. corr."
             value={forecast.historical_correlation.toFixed(2)}
           />
         </div>
       </div>
+
       {forecast.merchant_aliases && forecast.merchant_aliases.length > 0 && (
-        <div className="mt-4 flex flex-wrap gap-1 text-[10px] font-mono text-zinc-500">
-          <span className="mr-1 text-zinc-600">matched:</span>
+        <div className="mt-4 flex flex-wrap gap-1 font-mono text-[10px] text-[var(--bunq-faint)]">
+          <span className="mr-1 opacity-60">matched:</span>
           {forecast.merchant_aliases.map((m) => (
-            <span key={m} className="rounded bg-zinc-800 px-1.5 py-0.5">
+            <span
+              key={m}
+              className="rounded-full px-2 py-0.5"
+              style={{
+                background: "var(--bunq-surface-2)",
+                color: "var(--bunq-muted)",
+              }}
+            >
               {m}
             </span>
           ))}
         </div>
       )}
-      <div className="mt-4 text-[11px] text-zinc-500 italic">
+
+      <div className="mt-4 text-[11px] italic text-[var(--bunq-faint)]">
         {forecast.disclaimer}
       </div>
     </div>
@@ -74,15 +109,15 @@ function Stat({
   accent?: boolean;
 }) {
   return (
-    <div className="mt-1">
-      <span className="text-zinc-500">{label} </span>
+    <div className="mt-1 flex items-baseline justify-end gap-2">
+      <span className="text-xs text-[var(--bunq-faint)]">{label}</span>
       <span
-        className={`font-mono font-bold ${
+        className={`bunq-numeral font-mono font-bold ${
           accent === undefined
-            ? "text-zinc-200"
+            ? "text-[var(--bunq-text)]"
             : accent
-              ? "text-emerald-400"
-              : "text-rose-400"
+              ? "text-[var(--bunq-green)]"
+              : "text-[var(--bunq-bad)]"
         }`}
       >
         {value}

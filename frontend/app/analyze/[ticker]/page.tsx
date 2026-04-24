@@ -26,6 +26,23 @@ function ts() {
   return new Date().toTimeString().slice(0, 8);
 }
 
+function SubCard({ label, body }: { label: string; body: string }) {
+  return (
+    <div
+      className="rounded-xl p-2"
+      style={{
+        background: "var(--bunq-surface-2)",
+        border: "1px solid var(--bunq-border)",
+      }}
+    >
+      <div className="font-mono text-[9px] uppercase tracking-[0.18em] text-[var(--bunq-faint)]">
+        {label}
+      </div>
+      <div className="mt-1 text-xs text-[var(--bunq-text)]/85">{body}</div>
+    </div>
+  );
+}
+
 const MODULE_DISPLAY: Record<string, string> = {
   fundamentals: "fundamentals",
   news: "news",
@@ -153,7 +170,7 @@ export default function AnalyzePage() {
       <div className="flex items-center justify-between">
         <a
           href="/"
-          className="text-xs font-mono uppercase tracking-wider text-zinc-500 hover:text-zinc-300"
+          className="font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--bunq-faint)] hover:text-[var(--bunq-text)]"
         >
           ← back
         </a>
@@ -161,7 +178,12 @@ export default function AnalyzePage() {
           <button
             onClick={() => setEvidenceOpen(true)}
             disabled={pending || resynthing || !report}
-            className="rounded-lg border border-violet-600 bg-violet-950/40 px-4 py-2 text-sm font-semibold text-violet-200 hover:bg-violet-900/50 disabled:cursor-not-allowed disabled:opacity-40"
+            className="rounded-full px-4 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-40"
+            style={{
+              background: "var(--bunq-surface)",
+              border: "1px solid var(--bunq-border-strong)",
+              color: "var(--bunq-text)",
+            }}
             title={
               pending
                 ? "Wait for the initial pipeline to finish"
@@ -176,7 +198,11 @@ export default function AnalyzePage() {
             <button
               onClick={() => setInvestOpen(true)}
               disabled={resynthing}
-              className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
+              className="bunq-glow rounded-full px-5 py-2 text-sm font-bold disabled:opacity-50"
+              style={{
+                background: "var(--bunq-green)",
+                color: "#0a0d05",
+              }}
             >
               Invest →
             </button>
@@ -222,8 +248,15 @@ export default function AnalyzePage() {
       )}
 
       {report && !panel && !bunqSpending && (
-        <div className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-4 text-xs text-zinc-400">
-          <div className="mb-1 font-mono uppercase tracking-wider text-zinc-500">
+        <div
+          className="rounded-2xl p-4 text-xs"
+          style={{
+            background: "var(--bunq-surface)",
+            border: "1px solid var(--bunq-border)",
+            color: "var(--bunq-muted)",
+          }}
+        >
+          <div className="mb-1 font-mono uppercase tracking-[0.18em] text-[var(--bunq-faint)]">
             Coverage note
           </div>
           {report.ticker} isn't in our 25-stock demo seed, so the Bunq panel
@@ -235,10 +268,13 @@ export default function AnalyzePage() {
 
       {Object.keys(sections).length > 0 && (
         <section>
-          <h2 className="mb-3 text-xs font-mono uppercase tracking-wider text-zinc-500">
+          <h2 className="mb-3 font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--bunq-faint)]">
             Analyzer modules
             {pending && (
-              <span className="ml-2 inline-block animate-pulse text-emerald-400">
+              <span
+                className="ml-2 inline-block animate-pulse"
+                style={{ color: "var(--bunq-green)" }}
+              >
                 ●
               </span>
             )}
@@ -253,17 +289,21 @@ export default function AnalyzePage() {
 
       {userSources.length > 0 && (
         <section>
-          <h2 className="mb-3 text-xs font-mono uppercase tracking-wider text-violet-400">
+          <h2 className="mb-3 font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--bunq-faint)]">
             Your sources
           </h2>
           <div className="space-y-2">
             {userSources.map((u) => (
               <div
                 key={u.source_id}
-                className="rounded-lg border border-violet-900/50 bg-violet-950/20 p-4"
+                className="rounded-2xl p-4"
+                style={{
+                  background: "var(--bunq-surface)",
+                  border: "1px solid var(--bunq-border)",
+                }}
               >
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-mono uppercase text-violet-400">
+                  <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-[var(--bunq-muted)]">
                     {u.source_type} · {u.user_tag}
                     {u.origin && (
                       <a
@@ -271,24 +311,27 @@ export default function AnalyzePage() {
                         target="_blank"
                         rel="noopener noreferrer"
                         className="ml-2 underline decoration-dotted"
+                        style={{ color: "var(--bunq-green)" }}
                       >
                         link ↗
                       </a>
                     )}
                   </span>
-                  <span className="text-xs font-mono text-violet-500">
+                  <span className="bunq-numeral font-mono text-[11px] text-[var(--bunq-faint)]">
                     trust:{u.trust_level} · {u.score >= 0 ? "+" : ""}
                     {u.score.toFixed(2)}
                   </span>
                 </div>
                 {u.user_note && (
-                  <p className="mt-1 text-xs italic text-violet-300/80">
+                  <p className="mt-1 text-xs italic text-[var(--bunq-muted)]">
                     "{u.user_note}"
                   </p>
                 )}
-                <p className="mt-2 text-sm text-violet-100">{u.summary}</p>
+                <p className="mt-2 text-sm text-[var(--bunq-text)]/90">
+                  {u.summary}
+                </p>
                 {u.key_claims && u.key_claims.length > 0 && (
-                  <ul className="mt-2 space-y-0.5 text-xs text-violet-300/80">
+                  <ul className="mt-2 space-y-0.5 text-xs text-[var(--bunq-muted)]">
                     {u.key_claims.map((c, i) => (
                       <li key={i}>· {c}</li>
                     ))}
@@ -302,47 +345,65 @@ export default function AnalyzePage() {
 
       {geoOverlays.length > 0 && (
         <section>
-          <h2 className="mb-3 text-xs font-mono uppercase tracking-wider text-zinc-500">
+          <h2 className="mb-3 font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--bunq-faint)]">
             Geopolitical overlays
           </h2>
           <div className="space-y-3">
             {geoOverlays.map((g) => (
               <div
                 key={g.event_id}
-                className="overflow-hidden rounded-lg border border-amber-900/50 bg-amber-950/20"
+                className="overflow-hidden rounded-2xl"
+                style={{
+                  background: "var(--bunq-surface)",
+                  border: "1px solid var(--bunq-border)",
+                }}
               >
-                <div className="grid gap-4 p-4 md:grid-cols-[260px_1fr]">
+                <div className="grid gap-4 p-5 md:grid-cols-[260px_1fr]">
                   {g.clip_url ? (
                     <video
                       src={g.clip_url}
                       controls
                       preload="metadata"
                       playsInline
-                      className="aspect-video w-full rounded-md bg-black"
+                      className="aspect-video w-full rounded-xl bg-black"
                     />
                   ) : (
-                    <div className="flex aspect-video w-full items-center justify-center rounded-md border border-dashed border-amber-900/50 text-[10px] font-mono uppercase tracking-wider text-amber-700">
+                    <div
+                      className="flex aspect-video w-full items-center justify-center rounded-xl border border-dashed font-mono text-[10px] uppercase tracking-[0.18em]"
+                      style={{
+                        borderColor: "var(--bunq-border-strong)",
+                        color: "var(--bunq-faint)",
+                      }}
+                    >
                       live RSS · text-only
                     </div>
                   )}
                   <div>
                     <div className="flex items-start justify-between gap-2">
                       <div>
-                        <div className="text-sm font-semibold text-amber-200">
+                        <div className="text-sm font-bold text-[var(--bunq-text)]">
                           {g.speaker}
                           {g.clip_url && (
-                            <span className="ml-2 rounded bg-amber-900/60 px-1.5 py-0.5 text-[9px] font-mono uppercase tracking-wider text-amber-200">
+                            <span
+                              className="ml-2 rounded-full px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.16em]"
+                              style={{
+                                background: "var(--bunq-green-soft)",
+                                color: "var(--bunq-green)",
+                              }}
+                            >
                               video · prosody · vision
                             </span>
                           )}
                         </div>
-                        <div className="mt-0.5 font-mono text-[10px] text-amber-500">
+                        <div className="mt-0.5 font-mono text-[10px] text-[var(--bunq-faint)]">
                           {g.event_id}
                         </div>
                       </div>
-                      <div className="text-right text-xs font-mono text-amber-400">
-                        <div>rel {g.relevance.toFixed(2)}</div>
-                        <div>
+                      <div className="text-right font-mono text-xs text-[var(--bunq-muted)]">
+                        <div className="bunq-numeral">
+                          rel {g.relevance.toFixed(2)}
+                        </div>
+                        <div className="bunq-numeral">
                           impact{" "}
                           {g.impact_direction > 0
                             ? "+"
@@ -353,35 +414,24 @@ export default function AnalyzePage() {
                         </div>
                       </div>
                     </div>
-                    <p className="mt-2 text-sm text-amber-100/90">
+                    <p className="mt-2 text-sm text-[var(--bunq-text)]/90">
                       {g.reasoning}
                     </p>
                     {g.transcript_excerpt && (
-                      <blockquote className="mt-2 border-l-2 border-amber-700 pl-3 text-xs italic text-amber-300/80">
+                      <blockquote
+                        className="mt-2 border-l-2 pl-3 text-xs italic text-[var(--bunq-muted)]"
+                        style={{ borderColor: "var(--bunq-border-strong)" }}
+                      >
                         “{g.transcript_excerpt}”
                       </blockquote>
                     )}
                     {(g.tone_notes || g.visual_notes) && (
                       <div className="mt-3 grid gap-2 sm:grid-cols-2">
                         {g.tone_notes && (
-                          <div className="rounded border border-amber-900/40 bg-amber-950/40 p-2">
-                            <div className="text-[9px] font-mono uppercase tracking-wider text-amber-500">
-                              tone (audio)
-                            </div>
-                            <div className="mt-1 text-xs text-amber-100/85">
-                              {g.tone_notes}
-                            </div>
-                          </div>
+                          <SubCard label="tone (audio)" body={g.tone_notes} />
                         )}
                         {g.visual_notes && (
-                          <div className="rounded border border-amber-900/40 bg-amber-950/40 p-2">
-                            <div className="text-[9px] font-mono uppercase tracking-wider text-amber-500">
-                              visual (frame grid)
-                            </div>
-                            <div className="mt-1 text-xs text-amber-100/85">
-                              {g.visual_notes}
-                            </div>
-                          </div>
+                          <SubCard label="visual (frame grid)" body={g.visual_notes} />
                         )}
                       </div>
                     )}
@@ -395,10 +445,20 @@ export default function AnalyzePage() {
 
       {report && report.conflicts.length > 0 && (
         <section>
-          <h2 className="mb-3 text-xs font-mono uppercase tracking-wider text-amber-400">
+          <h2
+            className="mb-3 font-mono text-[10px] uppercase tracking-[0.18em]"
+            style={{ color: "var(--bunq-warn)" }}
+          >
             Module disagreements
           </h2>
-          <ul className="space-y-2 rounded-lg border border-amber-900/40 bg-amber-950/10 p-4 text-sm text-amber-100/90">
+          <ul
+            className="space-y-2 rounded-2xl p-4 text-sm"
+            style={{
+              background: "rgba(255,183,77,0.05)",
+              border: "1px solid rgba(255,183,77,0.18)",
+              color: "var(--bunq-text)",
+            }}
+          >
             {report.conflicts.map((c, i) => (
               <li key={i}>· {c}</li>
             ))}
@@ -408,10 +468,10 @@ export default function AnalyzePage() {
 
       {report && report.risks.length > 0 && (
         <section>
-          <h2 className="mb-3 text-xs font-mono uppercase tracking-wider text-zinc-500">
+          <h2 className="mb-3 font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--bunq-faint)]">
             Risks
           </h2>
-          <ul className="space-y-1 text-sm text-zinc-300">
+          <ul className="space-y-1 text-sm text-[var(--bunq-muted)]">
             {report.risks.map((r, i) => (
               <li key={i}>· {r}</li>
             ))}

@@ -39,17 +39,28 @@ export default function Landing() {
 
   return (
     <main className="flex flex-1 flex-col items-center px-6 py-16">
-      <div className="w-full max-w-xl space-y-8">
+      <div className="w-full max-w-xl space-y-10">
         <header>
-          <div className="font-mono text-xs uppercase tracking-wider text-fuchsia-400">
-            Sauron Wallet
+          <div className="flex items-center gap-2">
+            <span
+              className="inline-flex h-7 w-7 items-center justify-center rounded-full text-[15px] font-black"
+              style={{ background: "var(--bunq-green)", color: "#0a0d05" }}
+            >
+              b
+            </span>
+            <span className="bunq-numeral font-mono text-xs uppercase tracking-[0.22em] text-[var(--bunq-green)]">
+              Sauron Wallet
+            </span>
           </div>
-          <h1 className="mt-2 text-4xl font-black tracking-tight">
-            Multimodal AI investment analyst
+          <h1 className="mt-6 bunq-numeral text-5xl font-black leading-[1.05] tracking-tight text-[var(--bunq-text)]">
+            See what your{" "}
+            <span style={{ color: "var(--bunq-green)" }}>money</span> is doing
+            before it does.
           </h1>
-          <p className="mt-3 text-sm text-zinc-400">
-            Panel alt-data, geopolitical overlays, GPS, your own Bunq spending —
-            synthesized into a next-quarter revenue call and a one-tap money move.
+          <p className="mt-4 max-w-md text-sm leading-relaxed text-[var(--bunq-muted)]">
+            Hedge funds pay millions a year for one signal — aggregated card
+            spending that predicts quarterly revenue. Your bunq account
+            already has it. Tap a ticker, get a verdict, move money.
           </p>
         </header>
 
@@ -60,7 +71,7 @@ export default function Landing() {
           }}
           className="space-y-3"
         >
-          <label className="block text-xs font-mono uppercase tracking-wider text-zinc-500">
+          <label className="block font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--bunq-faint)]">
             Ticker
           </label>
           <div className="flex gap-2">
@@ -70,21 +81,34 @@ export default function Landing() {
                 setTyped(e.target.value);
                 if (error) setError(null);
               }}
-              placeholder="HEIA.AS, ASML, AAPL…"
-              className="flex-1 rounded-lg border border-zinc-800 bg-zinc-900 px-4 py-3 font-mono outline-none focus:border-zinc-600"
+              placeholder="HEIA.AS · ASML · AAPL"
+              className="bunq-numeral flex-1 rounded-full px-5 py-3 font-mono text-base outline-none"
+              style={{
+                background: "var(--bunq-surface-2)",
+                border: "1px solid var(--bunq-border-strong)",
+                color: "var(--bunq-text)",
+              }}
               autoFocus
               disabled={checking}
             />
             <button
               type="submit"
               disabled={checking || !typed.trim()}
-              className="rounded-lg bg-emerald-600 px-5 font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
+              className="bunq-glow rounded-full px-6 text-sm font-bold disabled:opacity-50"
+              style={{ background: "var(--bunq-green)", color: "#0a0d05" }}
             >
               {checking ? "Checking…" : "Analyze"}
             </button>
           </div>
           {error && (
-            <div className="rounded-md bg-rose-950/40 px-3 py-2 text-xs text-rose-300">
+            <div
+              className="rounded-2xl px-4 py-2 text-xs"
+              style={{
+                background: "var(--bunq-bad-soft)",
+                color: "var(--bunq-bad)",
+                border: "1px solid rgba(255,91,107,0.18)",
+              }}
+            >
               {error}
             </div>
           )}
@@ -92,10 +116,19 @@ export default function Landing() {
 
         <div className="relative">
           <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-zinc-800" />
+            <div
+              className="w-full border-t"
+              style={{ borderColor: "var(--bunq-border)" }}
+            />
           </div>
           <div className="relative flex justify-center">
-            <span className="bg-zinc-950 px-3 text-[10px] font-mono uppercase tracking-wider text-zinc-600">
+            <span
+              className="px-3 font-mono text-[10px] uppercase tracking-[0.22em]"
+              style={{
+                background: "var(--bunq-bg)",
+                color: "var(--bunq-faint)",
+              }}
+            >
               or
             </span>
           </div>
@@ -103,9 +136,9 @@ export default function Landing() {
 
         <NearbyTickersPicker onPick={(t, coords) => go(t.ticker, coords)} />
 
-        <footer className="pt-8 text-[11px] text-zinc-600">
-          Hackathon prototype. Not financial advice. Bunq sandbox + Alpaca paper
-          only.
+        <footer className="pt-4 text-[11px] leading-relaxed text-[var(--bunq-faint)]">
+          Hackathon prototype. Not financial advice. Bunq sandbox + Alpaca
+          paper only.
         </footer>
       </div>
     </main>

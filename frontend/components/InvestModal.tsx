@@ -23,7 +23,7 @@ export function InvestModal({
     Math.round((report.position_size_pct / 100) * 1000)
   );
   const MIN = 1;
-  const MAX = 10_000; // matches backend cap
+  const MAX = 10_000;
   const [amount, setAmount] = useState(defaultAmt);
   const [amountText, setAmountText] = useState(String(defaultAmt));
 
@@ -67,53 +67,74 @@ export function InvestModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
-      <div className="w-full max-w-md rounded-xl border border-zinc-800 bg-zinc-950 p-6 shadow-2xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 px-4">
+      <div
+        className="w-full max-w-md rounded-3xl border p-6 shadow-2xl"
+        style={{
+          background: "var(--bunq-surface)",
+          borderColor: "var(--bunq-border)",
+        }}
+      >
         {!receipt ? (
           <>
-            <div className="text-xs font-mono uppercase tracking-wider text-zinc-500">
-              bunq → investment pot · {report.ticker}
+            <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--bunq-green)]">
+              <BunqMark />
+              <span className="text-[var(--bunq-muted)]">
+                Move money · Main → Investment Pot
+              </span>
             </div>
-            <h2 className="mt-1 text-2xl font-bold">
-              Invest €{amount.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+            <h2 className="mt-2 bunq-numeral text-3xl font-black">
+              Invest €
+              {amount.toLocaleString(undefined, { maximumFractionDigits: 2 })}
             </h2>
-            <p className="mt-1 text-sm text-zinc-400">
-              Verdict: <span className="font-semibold">{report.verdict}</span> ·
+            <p className="mt-1 text-sm text-[var(--bunq-muted)]">
+              Verdict <span className="font-semibold text-[var(--bunq-text)]">{report.verdict}</span>
+              {" · "}
               recommended position {report.position_size_pct.toFixed(1)}%
             </p>
+
             {balance && (
-              <div className="mt-3 grid grid-cols-2 gap-2">
+              <div className="mt-4 grid grid-cols-2 gap-2">
                 <BalancePill label="Main Wallet" value={balance.main} />
-                <BalancePill
-                  label="Investment Pot"
-                  value={balance.pot}
-                  accent
-                />
+                <BalancePill label="Investment Pot" value={balance.pot} accent />
               </div>
             )}
-            <div className="mt-4 flex items-center gap-2">
-              <span className="font-mono text-sm text-zinc-500">€</span>
+
+            <div className="mt-5 flex items-center gap-2">
+              <span className="bunq-numeral font-mono text-2xl font-black text-[var(--bunq-faint)]">
+                €
+              </span>
               <input
                 type="text"
                 inputMode="decimal"
                 value={amountText}
                 onChange={(e) => setAmountFromText(e.target.value)}
                 onBlur={() => setAmountText(String(amount))}
-                className="flex-1 rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 font-mono text-lg outline-none focus:border-zinc-500"
+                className="bunq-numeral flex-1 rounded-2xl px-3 py-2.5 text-2xl font-black outline-none"
+                style={{
+                  background: "var(--bunq-surface-2)",
+                  border: "1px solid var(--bunq-border-strong)",
+                  color: "var(--bunq-text)",
+                }}
                 aria-label="Investment amount in EUR"
               />
-              <div className="flex gap-1">
-                {[25, 100, 500].map((q) => (
-                  <button
-                    key={q}
-                    type="button"
-                    onClick={() => setAmountFromSlider(q)}
-                    className="rounded border border-zinc-700 bg-zinc-800 px-2 py-1 text-[10px] font-mono text-zinc-300 hover:bg-zinc-700"
-                  >
-                    €{q}
-                  </button>
-                ))}
-              </div>
+            </div>
+            <div className="mt-2 flex gap-1.5">
+              {[25, 100, 500, 1000].map((q) => (
+                <button
+                  key={q}
+                  type="button"
+                  onClick={() => setAmountFromSlider(q)}
+                  className="rounded-full px-3 py-1 font-mono text-[11px] hover:opacity-80"
+                  style={{
+                    background: "var(--bunq-surface-2)",
+                    border: "1px solid var(--bunq-border)",
+                    color: "var(--bunq-muted)",
+                  }}
+                >
+                  €{q}
+                </button>
+              ))}
             </div>
             <input
               type="range"
@@ -122,34 +143,49 @@ export function InvestModal({
               step={1}
               value={amount}
               onChange={(e) => setAmountFromSlider(parseInt(e.target.value))}
-              className="mt-3 w-full"
+              className="mt-3 w-full accent-[var(--bunq-green)]"
             />
-            <div className="flex justify-between text-[10px] font-mono text-zinc-500">
+            <div className="flex justify-between font-mono text-[10px] text-[var(--bunq-faint)]">
               <span>€{MIN}</span>
               <span>up to €{MAX.toLocaleString()}</span>
             </div>
             {balance && amount > balance.main && (
-              <div className="mt-2 text-[11px] text-amber-300">
-                Main has €{balance.main.toFixed(2)} — we'll auto-top-up from
-                sandbox sugardaddy first.
+              <div className="mt-2 text-[11px] text-[var(--bunq-warn)]">
+                Main has €{balance.main.toFixed(2)} — we'll top-up from sandbox
+                sugardaddy first.
               </div>
             )}
             {error && (
-              <div className="mt-3 rounded-md bg-rose-950/50 p-2 text-xs text-rose-300">
+              <div
+                className="mt-3 rounded-xl p-2 text-xs"
+                style={{
+                  background: "var(--bunq-bad-soft)",
+                  color: "var(--bunq-bad)",
+                }}
+              >
                 {error}
               </div>
             )}
             <div className="mt-6 flex gap-2">
               <button
                 onClick={onClose}
-                className="flex-1 rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-2 text-sm hover:bg-zinc-700"
+                className="flex-1 rounded-full px-4 py-2.5 text-sm font-semibold"
+                style={{
+                  background: "var(--bunq-surface-2)",
+                  border: "1px solid var(--bunq-border-strong)",
+                  color: "var(--bunq-text)",
+                }}
               >
                 Cancel
               </button>
               <button
                 onClick={submit}
                 disabled={pending}
-                className="flex-1 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
+                className="bunq-glow flex-1 rounded-full px-4 py-2.5 text-sm font-bold disabled:opacity-50"
+                style={{
+                  background: "var(--bunq-green)",
+                  color: "#0a0d05",
+                }}
               >
                 {pending
                   ? "Moving money…"
@@ -159,21 +195,20 @@ export function InvestModal({
           </>
         ) : (
           <>
-            <div className="text-xs font-mono uppercase tracking-wider text-emerald-400">
+            <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--bunq-green)]">
+              <BunqMark />
               receipt
             </div>
-            <h2 className="mt-1 text-2xl font-bold">Transfer complete</h2>
+            <h2 className="mt-2 bunq-numeral text-3xl font-black">
+              Transfer complete
+            </h2>
             {balance && (
-              <div className="mt-3 grid grid-cols-2 gap-2">
+              <div className="mt-4 grid grid-cols-2 gap-2">
                 <BalancePill label="Main Wallet" value={balance.main} />
-                <BalancePill
-                  label="Investment Pot"
-                  value={balance.pot}
-                  accent
-                />
+                <BalancePill label="Investment Pot" value={balance.pot} accent />
               </div>
             )}
-            <dl className="mt-4 space-y-2 text-sm">
+            <dl className="mt-5 space-y-2 text-sm">
               <Row k="Bunq payment" v={receipt.bunq_payment_id ?? "—"} />
               <Row k="Alpaca order" v={receipt.alpaca_order_id ?? "—"} />
               <Row
@@ -182,11 +217,16 @@ export function InvestModal({
               />
               <Row k="Shares" v={receipt.shares.toString()} />
               <Row k="Ticker" v={receipt.ticker} />
-              <Row k="Timestamp" v={receipt.timestamp} />
+              <Row k="Timestamp" v={receipt.timestamp.slice(0, 19)} />
             </dl>
             <button
               onClick={onClose}
-              className="mt-6 w-full rounded-lg bg-zinc-800 px-4 py-2 text-sm hover:bg-zinc-700"
+              className="mt-6 w-full rounded-full px-4 py-2.5 text-sm font-semibold"
+              style={{
+                background: "var(--bunq-surface-2)",
+                border: "1px solid var(--bunq-border-strong)",
+                color: "var(--bunq-text)",
+              }}
             >
               Close
             </button>
@@ -199,9 +239,14 @@ export function InvestModal({
 
 function Row({ k, v }: { k: string; v: string }) {
   return (
-    <div className="flex justify-between gap-2 border-b border-zinc-900 pb-1">
-      <dt className="text-zinc-500">{k}</dt>
-      <dd className="truncate font-mono text-zinc-200">{v}</dd>
+    <div
+      className="flex justify-between gap-2 border-b pb-1"
+      style={{ borderColor: "var(--bunq-border)" }}
+    >
+      <dt className="text-[var(--bunq-faint)]">{k}</dt>
+      <dd className="bunq-numeral truncate font-mono text-[var(--bunq-text)]">
+        {v}
+      </dd>
     </div>
   );
 }
@@ -217,22 +262,35 @@ function BalancePill({
 }) {
   return (
     <div
-      className={`rounded-lg border px-3 py-2 ${
-        accent
-          ? "border-emerald-800 bg-emerald-950/40"
-          : "border-zinc-800 bg-zinc-900/60"
-      }`}
+      className="rounded-2xl px-3 py-2.5"
+      style={{
+        background: accent ? "var(--bunq-green-soft)" : "var(--bunq-surface-2)",
+        border: `1px solid ${accent ? "rgba(181,255,0,0.30)" : "var(--bunq-border)"}`,
+      }}
     >
-      <div className="text-[10px] font-mono uppercase tracking-wider text-zinc-500">
+      <div className="font-mono text-[9px] uppercase tracking-[0.18em] text-[var(--bunq-faint)]">
         {label}
       </div>
       <div
-        className={`mt-0.5 font-mono text-xl font-bold ${
-          accent ? "text-emerald-300" : "text-zinc-100"
-        }`}
+        className="bunq-numeral mt-0.5 font-mono text-2xl font-black"
+        style={{
+          color: accent ? "var(--bunq-green)" : "var(--bunq-text)",
+        }}
       >
         €{value.toFixed(2)}
       </div>
     </div>
+  );
+}
+
+function BunqMark() {
+  return (
+    <span
+      className="inline-flex h-4 w-4 items-center justify-center rounded-full text-[9px] font-black"
+      style={{ background: "var(--bunq-green)", color: "#0a0d05" }}
+      aria-hidden
+    >
+      b
+    </span>
   );
 }

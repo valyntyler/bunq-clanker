@@ -137,18 +137,38 @@ export function AddEvidenceModal({
         : "Add to analysis";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4">
-      <div className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-xl border border-zinc-800 bg-zinc-950 p-6 shadow-2xl">
-        <div className="text-xs font-mono uppercase tracking-wider text-violet-400">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 px-4">
+      <div
+        className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-3xl border p-6 shadow-2xl"
+        style={{
+          background: "var(--bunq-surface)",
+          borderColor: "var(--bunq-border)",
+        }}
+      >
+        <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--bunq-green)]">
+          <span
+            className="inline-flex h-4 w-4 items-center justify-center rounded-full text-[9px] font-black"
+            style={{ background: "var(--bunq-green)", color: "#0a0d05" }}
+          >
+            b
+          </span>
           add evidence · {ticker}
         </div>
-        <h2 className="mt-1 text-2xl font-bold">Feed it your own source</h2>
-        <p className="mt-1 text-sm text-zinc-400">
-          User sources are capped at 20% weight in the synthesizer; filings still
-          win in conflicts.
+        <h2 className="mt-2 bunq-numeral text-2xl font-black">
+          Feed it your own source
+        </h2>
+        <p className="mt-1 text-sm text-[var(--bunq-muted)]">
+          User sources are capped at 20% weight in the synthesizer; filings
+          still win in conflicts.
         </p>
 
-        <div className="mt-4 grid grid-cols-3 gap-1 rounded-lg border border-zinc-800 bg-zinc-900 p-1 sm:grid-cols-6">
+        <div
+          className="mt-4 grid grid-cols-3 gap-1 rounded-2xl p-1 sm:grid-cols-6"
+          style={{
+            background: "var(--bunq-surface-2)",
+            border: "1px solid var(--bunq-border)",
+          }}
+        >
           {(Object.keys(TAB_LABEL) as Tab[]).map((t) => (
             <TabBtn key={t} active={tab === t} onClick={() => setTab(t)}>
               {TAB_LABEL[t]}
@@ -158,7 +178,7 @@ export function AddEvidenceModal({
 
         {tab === "url" && (
           <div className="mt-3">
-            <label className="text-[10px] font-mono uppercase tracking-wider text-zinc-500">
+            <label className="font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--bunq-faint)]">
               URL
             </label>
             <input
@@ -166,10 +186,15 @@ export function AddEvidenceModal({
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               placeholder="https://…"
-              className="mt-1 w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 font-mono outline-none focus:border-zinc-500"
+              className="mt-1 w-full rounded-2xl px-3 py-2 font-mono outline-none"
+              style={{
+                background: "var(--bunq-surface-2)",
+                border: "1px solid var(--bunq-border-strong)",
+                color: "var(--bunq-text)",
+              }}
               autoFocus
             />
-            <div className="mt-1 text-[10px] text-zinc-500">
+            <div className="mt-1 text-[10px] text-[var(--bunq-faint)]">
               We fetch the page server-side and extract the article text.
             </div>
           </div>
@@ -177,7 +202,7 @@ export function AddEvidenceModal({
 
         {tab === "text" && (
           <div className="mt-3">
-            <label className="text-[10px] font-mono uppercase tracking-wider text-zinc-500">
+            <label className="font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--bunq-faint)]">
               Pasted text (paywalled article, your notes, …)
             </label>
             <textarea
@@ -185,7 +210,12 @@ export function AddEvidenceModal({
               onChange={(e) => setText(e.target.value)}
               rows={6}
               placeholder="Paste a paragraph or three. ≥30 characters."
-              className="mt-1 w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 font-mono text-sm outline-none focus:border-zinc-500"
+              className="mt-1 w-full rounded-2xl px-3 py-2 font-mono text-sm outline-none"
+              style={{
+                background: "var(--bunq-surface-2)",
+                border: "1px solid var(--bunq-border-strong)",
+                color: "var(--bunq-text)",
+              }}
               autoFocus
             />
           </div>
@@ -202,25 +232,35 @@ export function AddEvidenceModal({
         )}
 
         <div className="mt-3">
-          <label className="text-[10px] font-mono uppercase tracking-wider text-zinc-500">
+          <label className="font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--bunq-faint)]">
             Your note (optional)
           </label>
           <input
             value={note}
             onChange={(e) => setNote(e.target.value)}
             placeholder="Why are you adding this?"
-            className="mt-1 w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm outline-none focus:border-zinc-500"
+            className="mt-1 w-full rounded-2xl px-3 py-2 text-sm outline-none"
+            style={{
+              background: "var(--bunq-surface-2)",
+              border: "1px solid var(--bunq-border-strong)",
+              color: "var(--bunq-text)",
+            }}
           />
         </div>
 
         <div className="mt-3">
-          <label className="text-[10px] font-mono uppercase tracking-wider text-zinc-500">
+          <label className="font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--bunq-faint)]">
             Your stance on this source
           </label>
           <select
             value={tag}
             onChange={(e) => setTag(e.target.value as EvidenceTag)}
-            className="mt-1 w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm outline-none focus:border-zinc-500"
+            className="mt-1 w-full rounded-2xl px-3 py-2 text-sm outline-none"
+            style={{
+              background: "var(--bunq-surface-2)",
+              border: "1px solid var(--bunq-border-strong)",
+              color: "var(--bunq-text)",
+            }}
           >
             {(["supporting", "contradicting", "neutral"] as EvidenceTag[]).map(
               (t) => (
@@ -233,7 +273,13 @@ export function AddEvidenceModal({
         </div>
 
         {error && (
-          <div className="mt-3 rounded-md bg-rose-950/50 p-2 text-xs text-rose-300">
+          <div
+            className="mt-3 rounded-xl p-2 text-xs"
+            style={{
+              background: "var(--bunq-bad-soft)",
+              color: "var(--bunq-bad)",
+            }}
+          >
             {error}
           </div>
         )}
@@ -245,14 +291,20 @@ export function AddEvidenceModal({
               onClose();
             }}
             disabled={pending}
-            className="flex-1 rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-2 text-sm hover:bg-zinc-700 disabled:opacity-50"
+            className="flex-1 rounded-full px-4 py-2.5 text-sm font-semibold disabled:opacity-50"
+            style={{
+              background: "var(--bunq-surface-2)",
+              border: "1px solid var(--bunq-border-strong)",
+              color: "var(--bunq-text)",
+            }}
           >
             Cancel
           </button>
           <button
             onClick={submit}
             disabled={!canSubmit}
-            className="flex-1 rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-500 disabled:opacity-50"
+            className="bunq-glow flex-1 rounded-full px-4 py-2.5 text-sm font-bold disabled:opacity-50"
+            style={{ background: "var(--bunq-green)", color: "#0a0d05" }}
           >
             {pending ? "Analyzing…" : submitLabel}
           </button>
@@ -316,11 +368,12 @@ function TabBtn({
   return (
     <button
       onClick={onClick}
-      className={`rounded-md px-2 py-1.5 text-[11px] font-mono uppercase tracking-wider ${
+      className="rounded-xl px-2 py-1.5 font-mono text-[11px] uppercase tracking-[0.16em]"
+      style={
         active
-          ? "bg-zinc-800 text-zinc-100"
-          : "text-zinc-500 hover:text-zinc-300"
-      }`}
+          ? { background: "var(--bunq-surface)", color: "var(--bunq-text)" }
+          : { background: "transparent", color: "var(--bunq-faint)" }
+      }
     >
       {children}
     </button>

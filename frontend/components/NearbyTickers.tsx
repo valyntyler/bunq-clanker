@@ -49,43 +49,70 @@ export function NearbyTickersPicker({
       <button
         onClick={locate}
         disabled={loading}
-        className="w-full rounded-lg border border-sky-700 bg-sky-900/50 px-4 py-3 text-left text-sky-100 hover:bg-sky-900 disabled:opacity-50"
+        className="flex w-full items-center gap-3 rounded-3xl px-5 py-4 text-left transition hover:opacity-90 disabled:opacity-50"
+        style={{
+          background: "var(--bunq-surface)",
+          border: "1px solid var(--bunq-border-strong)",
+        }}
       >
-        <div className="flex items-center gap-2">
-          <span className="text-xl">📍</span>
-          <div>
-            <div className="font-semibold">
-              {loading ? "Locating…" : "Use my location"}
-            </div>
-            <div className="text-xs text-sky-300/80">
-              Find listed companies nearby
-            </div>
+        <span
+          className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-xl"
+          style={{
+            background: "var(--bunq-green-soft)",
+            color: "var(--bunq-green)",
+          }}
+        >
+          📍
+        </span>
+        <div>
+          <div className="text-sm font-bold text-[var(--bunq-text)]">
+            {loading ? "Locating…" : "Use my location"}
+          </div>
+          <div className="text-[11px] text-[var(--bunq-muted)]">
+            Find publicly listed companies near you
           </div>
         </div>
       </button>
+
       {error && (
-        <div className="rounded-md bg-rose-950/50 p-2 text-xs text-rose-300">
+        <div
+          className="rounded-2xl px-4 py-2 text-xs"
+          style={{
+            background: "var(--bunq-bad-soft)",
+            color: "var(--bunq-bad)",
+          }}
+        >
           {error}
         </div>
       )}
+
       {results.length > 0 && coords && (
-        <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-2">
-          <div className="px-2 py-1 text-[10px] font-mono uppercase text-zinc-500">
-            within 5km · {coords.lat.toFixed(4)},{coords.lng.toFixed(4)}
+        <div
+          className="overflow-hidden rounded-2xl"
+          style={{
+            background: "var(--bunq-surface)",
+            border: "1px solid var(--bunq-border)",
+          }}
+        >
+          <div className="px-4 py-2 font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--bunq-faint)]">
+            within 5km · {coords.lat.toFixed(4)}, {coords.lng.toFixed(4)}
           </div>
           {results.slice(0, 8).map((r, i) => (
             <button
               key={`${r.ticker}-${i}`}
               onClick={() => onPick(r, coords)}
-              className="flex w-full items-baseline justify-between rounded px-2 py-2 text-left hover:bg-zinc-800"
+              className="flex w-full items-baseline justify-between border-t px-4 py-3 text-left transition hover:bg-[var(--bunq-surface-2)]"
+              style={{ borderColor: "var(--bunq-border)" }}
             >
               <div>
-                <span className="font-mono text-sm text-zinc-100">
+                <span className="bunq-numeral font-mono text-sm font-bold text-[var(--bunq-text)]">
                   {r.ticker}
                 </span>
-                <span className="ml-2 text-sm text-zinc-400">{r.name}</span>
+                <span className="ml-2 text-sm text-[var(--bunq-muted)]">
+                  {r.name}
+                </span>
               </div>
-              <span className="text-[10px] font-mono text-zinc-500">
+              <span className="bunq-numeral font-mono text-[11px] text-[var(--bunq-faint)]">
                 {r.distance_m < 1 ? "0m" : `${Math.round(r.distance_m)}m`}
               </span>
             </button>
