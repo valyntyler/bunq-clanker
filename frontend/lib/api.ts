@@ -197,7 +197,7 @@ export type AnalyzeEvent =
       event: "module_done";
       name: string;
       section?: Section;
-      data?: ConsumerPanelForecast | BunqSpendingOverlay;
+      data?: ConsumerPanelForecast | BunqSpendingOverlay | GeopoliticalOverlay[];
       error?: string;
     }
   | { event: "synthesizing" }

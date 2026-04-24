@@ -16,11 +16,13 @@ from backend.analyzers.bunq_spending import analyze_personal_spending
 from backend.analyzers.chart_vision import analyze_chart
 from backend.analyzers.consumer_panel import analyze_consumer_panel
 from backend.analyzers.fundamentals import analyze_fundamentals
+from backend.analyzers.geopolitical import analyze_geopolitical
 from backend.analyzers.news_sentiment import analyze_news
 from backend.analyzers.synthesizer import synthesize
 from backend.models import (
     BunqSpendingOverlay,
     ConsumerPanelForecast,
+    GeopoliticalOverlay,
     LocationContext,
     Report,
     Section,
@@ -40,10 +42,11 @@ async def _gather_modules(ticker: str) -> dict[str, Any]:
     chart_task = _run(analyze_chart, ticker)
     panel_task = _run(_safe_panel, ticker)
     bunq_task = _run(_safe_bunq_spending, ticker)
+    geo_task = _run(_safe_geopolitical, ticker)
 
     # news needs the company name from fundamentals — do it after fund resolves
-    fund_result, chart_result, panel_result, bunq_result = await asyncio.gather(
-        fund_task, chart_task, panel_task, bunq_task, return_exceptions=True
+    fund_result, chart_result, panel_result, bunq_result, geo_result = await asyncio.gather(
+        fund_task, chart_task, panel_task, bunq_task, geo_task, return_exceptions=True
     )
 
     out: dict[str, Any] = {}
@@ -73,6 +76,12 @@ async def _gather_modules(ticker: str) -> dict[str, Any]:
     if isinstance(bunq_result, BaseException):
         log.exception("bunq_spending failed", exc_info=bunq_result)
 
+    if isinstance(geo_result, BaseException):
+        log.exception("geopolitical failed", exc_info=geo_result)
+        out["geopolitical"] = []
+    else:
+        out["geopolitical"] = geo_result or []
+
     out["company_name"] = company_name
     return out
 
@@ -92,12 +101,24 @@ def _safe_bunq_spending(ticker: str) -> BunqSpendingOverlay | None:
         return None
 
 
-def _safe_news(ticker: str, company_name: str) -> Section | None:
+def _safe_news(ticker: str, company_name: str | None = None) -> Section | None:
     try:
-        return analyze_news(ticker, company_name)
+        return analyze_news(ticker, company_name or None)
     except Exception:  # noqa: BLE001
         log.exception("news failed")
         return None
+
+
+def _safe_geopolitical(
+    ticker: str, company_name: str | None = None, sector: str | None = None
+) -> list[GeopoliticalOverlay]:
+    try:
+        return analyze_geopolitical(
+            ticker=ticker, company_name=company_name, sector=sector
+        )
+    except Exception:  # noqa: BLE001
+        log.exception("geopolitical failed")
+        return []
 
 
 async def analyze_async(
@@ -117,6 +138,7 @@ async def analyze_async(
 
     panel: ConsumerPanelForecast | None = modules.get("panel")
     bunq_spending: BunqSpendingOverlay | None = modules.get("bunq_spending")
+    geopolitical: list[GeopoliticalOverlay] = modules.get("geopolitical") or []
     company_name: str = modules["company_name"]
 
     synth = synthesize(
@@ -124,6 +146,7 @@ async def analyze_async(
         company_name=company_name,
         sections=sections,
         consumer_panel=panel,
+        geopolitical_overlays=geopolitical,
         bunq_spending=bunq_spending,
     )
 
@@ -138,6 +161,7 @@ async def analyze_async(
         sections=sections,
         consumer_panel_forecast=panel,
         bunq_spending_overlay=bunq_spending,
+        geopolitical_overlays=geopolitical,
         location_context=LocationContext(
             used=coords is not None,
             detected_at=location_label,
@@ -168,6 +192,7 @@ _MODULE_LABELS = {
     "chart": "chart-vision (1y candlestick)",
     "panel": "consumer panel forecast",
     "bunq_spending": "personal Bunq spending",
+    "geopolitical": "geopolitical overlays (live RSS)",
 }
 
 
@@ -208,7 +233,8 @@ async def analyze_stream(
         "chart":        _labeled("chart",        _run(analyze_chart, ticker)),
         "panel":        _labeled("panel",        _run(_safe_panel, ticker)),
         "bunq_spending": _labeled("bunq_spending", _run(_safe_bunq_spending, ticker)),
-        "news":         _labeled("news",         _run(_safe_news, ticker, None)),
+        "news":         _labeled("news",         _run(_safe_news, ticker, "")),
+        "geopolitical": _labeled("geopolitical", _run(_safe_geopolitical, ticker)),
     }
     for name in parallel:
         yield {"event": "module_start", "name": name, "label": _MODULE_LABELS[name]}
@@ -239,6 +265,13 @@ async def analyze_stream(
                 "name": name,
                 "section": _section_payload(result),
             }
+        elif name == "geopolitical":
+            results[name] = result or []
+            yield {
+                "event": "module_done",
+                "name": name,
+                "data": [o.model_dump() for o in (result or [])],
+            }
         else:
             # panel or bunq_spending — overlay objects (or None when no data)
             results[name] = result
@@ -257,6 +290,7 @@ async def analyze_stream(
             sections[key] = s
     panel: ConsumerPanelForecast | None = results.get("panel")
     bunq_spending: BunqSpendingOverlay | None = results.get("bunq_spending")
+    geopolitical: list[GeopoliticalOverlay] = results.get("geopolitical") or []
     company_name = fundamentals_raw.name if fundamentals_raw else ticker
 
     synth = await _run(
@@ -265,6 +299,7 @@ async def analyze_stream(
         company_name=company_name,
         sections=sections,
         consumer_panel=panel,
+        geopolitical_overlays=geopolitical,
         bunq_spending=bunq_spending,
     )
 
@@ -279,6 +314,7 @@ async def analyze_stream(
         sections=sections,
         consumer_panel_forecast=panel,
         bunq_spending_overlay=bunq_spending,
+        geopolitical_overlays=geopolitical,
         location_context=LocationContext(
             used=coords is not None,
             detected_at=location_label,

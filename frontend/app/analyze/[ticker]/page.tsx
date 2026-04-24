@@ -7,6 +7,7 @@ import {
   type AnalyzeEvent,
   type BunqSpendingOverlay,
   type ConsumerPanelForecast,
+  type GeopoliticalOverlay,
   type Report,
   type Section,
   type UserSource,
@@ -51,6 +52,7 @@ export default function AnalyzePage() {
   const [investOpen, setInvestOpen] = useState(false);
   const [evidenceOpen, setEvidenceOpen] = useState(false);
   const [userSources, setUserSources] = useState<UserSource[]>([]);
+  const [geoOverlays, setGeoOverlays] = useState<GeopoliticalOverlay[]>([]);
   const startedAt = useRef<number>(0);
 
   useEffect(() => {
@@ -64,6 +66,7 @@ export default function AnalyzePage() {
     setPanel(null);
     setBunqSpending(null);
     setUserSources([]);
+    setGeoOverlays([]);
     setErr(null);
     setPending(true);
     startedAt.current = performance.now();
@@ -101,6 +104,10 @@ export default function AnalyzePage() {
                 `✓ bunq_spending (${dt}s) €${b.total_spent_12m_eur.toFixed(0)}/${b.visit_count}v ${b.trend}`
               );
               setBunqSpending(b);
+            } else if (ev.name === "geopolitical") {
+              const overlays = ev.data as GeopoliticalOverlay[];
+              log(`✓ geopolitical (${dt}s) ${overlays.length} overlays`);
+              setGeoOverlays(overlays);
             }
           } else {
             log(`· ${ev.name} (${dt}s) — no data`);
@@ -251,13 +258,13 @@ export default function AnalyzePage() {
         </section>
       )}
 
-      {report && report.geopolitical_overlays.length > 0 && (
+      {geoOverlays.length > 0 && (
         <section>
           <h2 className="mb-3 text-xs font-mono uppercase tracking-wider text-zinc-500">
             Geopolitical overlays
           </h2>
           <div className="space-y-3">
-            {report.geopolitical_overlays.map((g) => (
+            {geoOverlays.map((g) => (
               <div
                 key={g.event_id}
                 className="rounded-lg border border-amber-900/50 bg-amber-950/20 p-4"
