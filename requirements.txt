@@ -1,0 +1,38 @@
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+httpx==0.28.1
+pydantic==2.10.4
+sqlmodel==0.0.22
+python-dotenv==1.0.1
+python-multipart==0.0.20
+
+# AWS
+boto3==1.35.90
+
+# LLM fallback
+anthropic==0.42.0
+
+# finance
+yfinance==0.2.51
+sec-edgar-downloader==5.0.3
+
+# news
+newsapi-python==0.2.7
+
+# scraping / rendering
+playwright==1.49.1
+selectolax==0.3.27
+mplfinance==0.12.10b0
+pillow==11.0.0
+
+# media
+yt-dlp==2024.12.23
+ffmpeg-python==0.2.0
+librosa==0.10.2.post1
+
+# documents
+pymupdf==1.25.1
+
+# brokerage / banking
+alpaca-py==0.36.0
+bunq_sdk==1.23.0

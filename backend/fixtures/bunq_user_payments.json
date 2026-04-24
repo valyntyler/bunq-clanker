@@ -1,0 +1,1913 @@
+[
+  {
+    "date": "2025-04-25",
+    "amount_eur": 42.79,
+    "merchant": "Albert Heijn",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-04-25",
+    "amount_eur": 42.07,
+    "merchant": "Albert Heijn",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-04-25",
+    "amount_eur": 12.99,
+    "merchant": "Netflix",
+    "geo_city": "Online",
+    "type": "online"
+  },
+  {
+    "date": "2025-04-26",
+    "amount_eur": 76.18,
+    "merchant": "Shell",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-04-26",
+    "amount_eur": 27.43,
+    "merchant": "Hema",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-04-26",
+    "amount_eur": 22.09,
+    "merchant": "Hema",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-04-26",
+    "amount_eur": 27.44,
+    "merchant": "NS Travel",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-04-27",
+    "amount_eur": 41.58,
+    "merchant": "Albert Heijn",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-05-06",
+    "amount_eur": 52.91,
+    "merchant": "Albert Heijn",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-05-06",
+    "amount_eur": 53.96,
+    "merchant": "Albert Heijn",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-05-06",
+    "amount_eur": 9.53,
+    "merchant": "AH to go",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-05-08",
+    "amount_eur": 14.47,
+    "merchant": "Albert Heijn",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-05-08",
+    "amount_eur": 6.76,
+    "merchant": "AH to go",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-05-08",
+    "amount_eur": 4.99,
+    "merchant": "Amazon Prime",
+    "geo_city": "Online",
+    "type": "online"
+  },
+  {
+    "date": "2025-05-08",
+    "amount_eur": 13.22,
+    "merchant": "McDonald's",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-05-09",
+    "amount_eur": 18.6,
+    "merchant": "Apple Store",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-05-10",
+    "amount_eur": 5.39,
+    "merchant": "Hema",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-05-15",
+    "amount_eur": 27.13,
+    "merchant": "Thuisbezorgd",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-05-21",
+    "amount_eur": 10.99,
+    "merchant": "Spotify",
+    "geo_city": "Online",
+    "type": "online"
+  },
+  {
+    "date": "2025-05-21",
+    "amount_eur": 2.27,
+    "merchant": "ING",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-05-21",
+    "amount_eur": 24.22,
+    "merchant": "Hema",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-05-22",
+    "amount_eur": 25.49,
+    "merchant": "Albert Heijn",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-05-23",
+    "amount_eur": 9.34,
+    "merchant": "Etos",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-05-24",
+    "amount_eur": 9.55,
+    "merchant": "AH to go",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-05-25",
+    "amount_eur": 64.69,
+    "merchant": "Albert Heijn",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-05-25",
+    "amount_eur": 19.94,
+    "merchant": "Thuisbezorgd",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-05-28",
+    "amount_eur": 6.17,
+    "merchant": "Starbucks",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-05-29",
+    "amount_eur": 14.34,
+    "merchant": "Amazon.nl",
+    "geo_city": "Online",
+    "type": "online"
+  },
+  {
+    "date": "2025-05-29",
+    "amount_eur": 172.69,
+    "merchant": "Nike Store",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-05-30",
+    "amount_eur": 19.99,
+    "merchant": "NS Travel",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-06-02",
+    "amount_eur": 7.05,
+    "merchant": "McDonald's",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-06-02",
+    "amount_eur": 7.91,
+    "merchant": "Starbucks",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-06-03",
+    "amount_eur": 15.25,
+    "merchant": "Thuisbezorgd",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-06-03",
+    "amount_eur": 22.86,
+    "merchant": "NS Travel",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-06-05",
+    "amount_eur": 10.99,
+    "merchant": "Spotify",
+    "geo_city": "Online",
+    "type": "online"
+  },
+  {
+    "date": "2025-06-05",
+    "amount_eur": 22.18,
+    "merchant": "Thuisbezorgd",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-06-07",
+    "amount_eur": 7.46,
+    "merchant": "App Store",
+    "geo_city": "Online",
+    "type": "online"
+  },
+  {
+    "date": "2025-06-07",
+    "amount_eur": 10.99,
+    "merchant": "Spotify",
+    "geo_city": "Online",
+    "type": "online"
+  },
+  {
+    "date": "2025-06-07",
+    "amount_eur": 7.36,
+    "merchant": "McDonald's",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-06-07",
+    "amount_eur": 21.42,
+    "merchant": "Hema",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-06-08",
+    "amount_eur": 13.95,
+    "merchant": "AH to go",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-06-08",
+    "amount_eur": 12.99,
+    "merchant": "Netflix",
+    "geo_city": "Online",
+    "type": "online"
+  },
+  {
+    "date": "2025-06-09",
+    "amount_eur": 3.01,
+    "merchant": "App Store",
+    "geo_city": "Online",
+    "type": "online"
+  },
+  {
+    "date": "2025-06-09",
+    "amount_eur": 8.09,
+    "merchant": "McDonald's",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-06-09",
+    "amount_eur": 11.53,
+    "merchant": "Etos",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-06-10",
+    "amount_eur": 16.4,
+    "merchant": "Thuisbezorgd",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-06-11",
+    "amount_eur": 78.08,
+    "merchant": "Shell",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-06-12",
+    "amount_eur": 4.99,
+    "merchant": "Amazon Prime",
+    "geo_city": "Online",
+    "type": "online"
+  },
+  {
+    "date": "2025-06-13",
+    "amount_eur": 18.75,
+    "merchant": "Hema",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-06-14",
+    "amount_eur": 1.72,
+    "merchant": "App Store",
+    "geo_city": "Online",
+    "type": "online"
+  },
+  {
+    "date": "2025-06-14",
+    "amount_eur": 49.93,
+    "merchant": "Amazon.nl",
+    "geo_city": "Online",
+    "type": "online"
+  },
+  {
+    "date": "2025-06-15",
+    "amount_eur": 10.99,
+    "merchant": "Spotify",
+    "geo_city": "Online",
+    "type": "online"
+  },
+  {
+    "date": "2025-06-15",
+    "amount_eur": 19.76,
+    "merchant": "NS Travel",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-06-17",
+    "amount_eur": 12.7,
+    "merchant": "NS Travel",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-06-20",
+    "amount_eur": 62.51,
+    "merchant": "Albert Heijn",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-06-20",
+    "amount_eur": 3.0,
+    "merchant": "Apple.com",
+    "geo_city": "Online",
+    "type": "online"
+  },
+  {
+    "date": "2025-06-23",
+    "amount_eur": 4.99,
+    "merchant": "Amazon Prime",
+    "geo_city": "Online",
+    "type": "online"
+  },
+  {
+    "date": "2025-06-23",
+    "amount_eur": 62.24,
+    "merchant": "Shell",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-06-24",
+    "amount_eur": 4.99,
+    "merchant": "Amazon Prime",
+    "geo_city": "Online",
+    "type": "online"
+  },
+  {
+    "date": "2025-06-26",
+    "amount_eur": 15.27,
+    "merchant": "NS Travel",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-06-27",
+    "amount_eur": 14.83,
+    "merchant": "Just Eat",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-06-29",
+    "amount_eur": 11.06,
+    "merchant": "Hema",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-06-30",
+    "amount_eur": 46.11,
+    "merchant": "Albert Heijn",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-07-01",
+    "amount_eur": 10.99,
+    "merchant": "Spotify",
+    "geo_city": "Online",
+    "type": "online"
+  },
+  {
+    "date": "2025-07-07",
+    "amount_eur": 8.16,
+    "merchant": "App Store",
+    "geo_city": "Online",
+    "type": "online"
+  },
+  {
+    "date": "2025-07-08",
+    "amount_eur": 1.85,
+    "merchant": "App Store",
+    "geo_city": "Online",
+    "type": "online"
+  },
+  {
+    "date": "2025-07-09",
+    "amount_eur": 33.93,
+    "merchant": "Albert Heijn",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-07-09",
+    "amount_eur": 27.63,
+    "merchant": "Just Eat",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-07-12",
+    "amount_eur": 39.07,
+    "merchant": "Albert Heijn",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-07-17",
+    "amount_eur": 1.71,
+    "merchant": "App Store",
+    "geo_city": "Online",
+    "type": "online"
+  },
+  {
+    "date": "2025-07-17",
+    "amount_eur": 73.2,
+    "merchant": "Shell",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-07-17",
+    "amount_eur": 3.35,
+    "merchant": "ING",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-07-17",
+    "amount_eur": 16.52,
+    "merchant": "NS Travel",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-07-18",
+    "amount_eur": 31.9,
+    "merchant": "Amazon.nl",
+    "geo_city": "Online",
+    "type": "online"
+  },
+  {
+    "date": "2025-07-19",
+    "amount_eur": 14.86,
+    "merchant": "Hema",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-07-22",
+    "amount_eur": 24.58,
+    "merchant": "Amstel Tap House",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-07-24",
+    "amount_eur": 15.07,
+    "merchant": "Apple Store",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-07-25",
+    "amount_eur": 10.99,
+    "merchant": "Spotify",
+    "geo_city": "Online",
+    "type": "online"
+  },
+  {
+    "date": "2025-07-26",
+    "amount_eur": 3.4,
+    "merchant": "ING",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-07-27",
+    "amount_eur": 12.99,
+    "merchant": "Netflix",
+    "geo_city": "Online",
+    "type": "online"
+  },
+  {
+    "date": "2025-07-27",
+    "amount_eur": 2.71,
+    "merchant": "ING",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-07-27",
+    "amount_eur": 9.82,
+    "merchant": "Hema",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-08-09",
+    "amount_eur": 34.88,
+    "merchant": "Cafe Heineken Hoek",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-08-10",
+    "amount_eur": 12.99,
+    "merchant": "Netflix",
+    "geo_city": "Online",
+    "type": "online"
+  },
+  {
+    "date": "2025-08-11",
+    "amount_eur": 3.35,
+    "merchant": "Starbucks",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-08-12",
+    "amount_eur": 8.66,
+    "merchant": "Albert Heijn",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-08-12",
+    "amount_eur": 4.99,
+    "merchant": "Amazon Prime",
+    "geo_city": "Online",
+    "type": "online"
+  },
+  {
+    "date": "2025-08-14",
+    "amount_eur": 26.48,
+    "merchant": "Just Eat",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-08-14",
+    "amount_eur": 12.29,
+    "merchant": "NS Travel",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-08-16",
+    "amount_eur": 4.99,
+    "merchant": "Amazon Prime",
+    "geo_city": "Online",
+    "type": "online"
+  },
+  {
+    "date": "2025-08-20",
+    "amount_eur": 17.11,
+    "merchant": "Thuisbezorgd",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-08-20",
+    "amount_eur": 72.89,
+    "merchant": "Shell",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-08-21",
+    "amount_eur": 10.99,
+    "merchant": "Spotify",
+    "geo_city": "Online",
+    "type": "online"
+  },
+  {
+    "date": "2025-08-22",
+    "amount_eur": 12.99,
+    "merchant": "Netflix",
+    "geo_city": "Online",
+    "type": "online"
+  },
+  {
+    "date": "2025-08-22",
+    "amount_eur": 14.37,
+    "merchant": "NS Travel",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-08-23",
+    "amount_eur": 3.13,
+    "merchant": "ING",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-08-24",
+    "amount_eur": 14.53,
+    "merchant": "Just Eat",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-08-26",
+    "amount_eur": 63.49,
+    "merchant": "Albert Heijn",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-08-26",
+    "amount_eur": 4.99,
+    "merchant": "Amazon Prime",
+    "geo_city": "Online",
+    "type": "online"
+  },
+  {
+    "date": "2025-08-27",
+    "amount_eur": 9.56,
+    "merchant": "AH to go",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-08-29",
+    "amount_eur": 85.95,
+    "merchant": "Shell",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-08-31",
+    "amount_eur": 108.83,
+    "merchant": "Nike Store",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-08-31",
+    "amount_eur": 5.36,
+    "merchant": "Hema",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-09-01",
+    "amount_eur": 16.23,
+    "merchant": "NS Travel",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-09-03",
+    "amount_eur": 15.89,
+    "merchant": "Albert Heijn",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-09-05",
+    "amount_eur": 8.79,
+    "merchant": "App Store",
+    "geo_city": "Online",
+    "type": "online"
+  },
+  {
+    "date": "2025-09-07",
+    "amount_eur": 16.79,
+    "merchant": "McDonald's",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-09-08",
+    "amount_eur": 11.97,
+    "merchant": "Albert Heijn",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-09-08",
+    "amount_eur": 6.31,
+    "merchant": "AH to go",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-09-10",
+    "amount_eur": 62.45,
+    "merchant": "Albert Heijn",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-09-11",
+    "amount_eur": 11.47,
+    "merchant": "AH to go",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-09-12",
+    "amount_eur": 6.14,
+    "merchant": "Starbucks",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-09-13",
+    "amount_eur": 8.75,
+    "merchant": "Apple.com",
+    "geo_city": "Online",
+    "type": "online"
+  },
+  {
+    "date": "2025-09-14",
+    "amount_eur": 87.74,
+    "merchant": "Amazon.nl",
+    "geo_city": "Online",
+    "type": "online"
+  },
+  {
+    "date": "2025-09-15",
+    "amount_eur": 10.65,
+    "merchant": "McDonald's",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-09-15",
+    "amount_eur": 16.1,
+    "merchant": "NS Travel",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-09-18",
+    "amount_eur": 10.91,
+    "merchant": "AH to go",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-09-18",
+    "amount_eur": 4.54,
+    "merchant": "Apple.com",
+    "geo_city": "Online",
+    "type": "online"
+  },
+  {
+    "date": "2025-09-19",
+    "amount_eur": 20.92,
+    "merchant": "Desperados Lounge",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-09-20",
+    "amount_eur": 33.42,
+    "merchant": "Amazon.nl",
+    "geo_city": "Online",
+    "type": "online"
+  },
+  {
+    "date": "2025-09-20",
+    "amount_eur": 4.99,
+    "merchant": "Amazon Prime",
+    "geo_city": "Online",
+    "type": "online"
+  },
+  {
+    "date": "2025-09-26",
+    "amount_eur": 17.95,
+    "merchant": "Hema",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-09-27",
+    "amount_eur": 4.99,
+    "merchant": "Amazon Prime",
+    "geo_city": "Online",
+    "type": "online"
+  },
+  {
+    "date": "2025-09-29",
+    "amount_eur": 3.93,
+    "merchant": "Starbucks",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-09-30",
+    "amount_eur": 10.72,
+    "merchant": "Thuisbezorgd",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-10-01",
+    "amount_eur": 19.08,
+    "merchant": "Apple Store",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-10-01",
+    "amount_eur": 11.67,
+    "merchant": "Apple.com",
+    "geo_city": "Online",
+    "type": "online"
+  },
+  {
+    "date": "2025-10-02",
+    "amount_eur": 28.86,
+    "merchant": "Albert Heijn",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-10-02",
+    "amount_eur": 12.88,
+    "merchant": "Albert Heijn",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-10-03",
+    "amount_eur": 1.31,
+    "merchant": "App Store",
+    "geo_city": "Online",
+    "type": "online"
+  },
+  {
+    "date": "2025-10-07",
+    "amount_eur": 22.67,
+    "merchant": "Thuisbezorgd",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-10-09",
+    "amount_eur": 4.92,
+    "merchant": "Hema",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-10-11",
+    "amount_eur": 10.99,
+    "merchant": "Spotify",
+    "geo_city": "Online",
+    "type": "online"
+  },
+  {
+    "date": "2025-10-13",
+    "amount_eur": 16.34,
+    "merchant": "Just Eat",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-10-15",
+    "amount_eur": 2.84,
+    "merchant": "Apple.com",
+    "geo_city": "Online",
+    "type": "online"
+  },
+  {
+    "date": "2025-10-17",
+    "amount_eur": 7.25,
+    "merchant": "AH to go",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-10-17",
+    "amount_eur": 12.99,
+    "merchant": "Netflix",
+    "geo_city": "Online",
+    "type": "online"
+  },
+  {
+    "date": "2025-10-20",
+    "amount_eur": 9.71,
+    "merchant": "AH to go",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-10-22",
+    "amount_eur": 11.76,
+    "merchant": "AH to go",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-10-25",
+    "amount_eur": 74.7,
+    "merchant": "Amazon.nl",
+    "geo_city": "Online",
+    "type": "online"
+  },
+  {
+    "date": "2025-10-25",
+    "amount_eur": 41.84,
+    "merchant": "Shell",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-10-26",
+    "amount_eur": 18.74,
+    "merchant": "Just Eat",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-10-27",
+    "amount_eur": 62.37,
+    "merchant": "Albert Heijn",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-10-27",
+    "amount_eur": 10.99,
+    "merchant": "Spotify",
+    "geo_city": "Online",
+    "type": "online"
+  },
+  {
+    "date": "2025-10-29",
+    "amount_eur": 40.43,
+    "merchant": "Heineken Pilsner Bar",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-10-29",
+    "amount_eur": 7.52,
+    "merchant": "AH to go",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-11-04",
+    "amount_eur": 43.23,
+    "merchant": "Cafe Heineken Hoek",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-11-04",
+    "amount_eur": 26.32,
+    "merchant": "Amazon.nl",
+    "geo_city": "Online",
+    "type": "online"
+  },
+  {
+    "date": "2025-11-04",
+    "amount_eur": 10.99,
+    "merchant": "Spotify",
+    "geo_city": "Online",
+    "type": "online"
+  },
+  {
+    "date": "2025-11-05",
+    "amount_eur": 4.99,
+    "merchant": "Amazon Prime",
+    "geo_city": "Online",
+    "type": "online"
+  },
+  {
+    "date": "2025-11-06",
+    "amount_eur": 23.05,
+    "merchant": "Hema",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-11-07",
+    "amount_eur": 12.99,
+    "merchant": "Netflix",
+    "geo_city": "Online",
+    "type": "online"
+  },
+  {
+    "date": "2025-11-10",
+    "amount_eur": 61.12,
+    "merchant": "Albert Heijn",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-11-12",
+    "amount_eur": 14.28,
+    "merchant": "Apple Store",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-11-12",
+    "amount_eur": 9.1,
+    "merchant": "Apple.com",
+    "geo_city": "Online",
+    "type": "online"
+  },
+  {
+    "date": "2025-11-13",
+    "amount_eur": 12.99,
+    "merchant": "Netflix",
+    "geo_city": "Online",
+    "type": "online"
+  },
+  {
+    "date": "2025-11-16",
+    "amount_eur": 2.89,
+    "merchant": "ING",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-11-20",
+    "amount_eur": 37.44,
+    "merchant": "Albert Heijn",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-11-22",
+    "amount_eur": 21.17,
+    "merchant": "Albert Heijn",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-11-26",
+    "amount_eur": 75.76,
+    "merchant": "Shell",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-11-27",
+    "amount_eur": 10.24,
+    "merchant": "NS Travel",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-11-30",
+    "amount_eur": 23.43,
+    "merchant": "NS Travel",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-12-01",
+    "amount_eur": 14.64,
+    "merchant": "Thuisbezorgd",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-12-01",
+    "amount_eur": 20.99,
+    "merchant": "NS Travel",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-12-04",
+    "amount_eur": 47.57,
+    "merchant": "Albert Heijn",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-12-04",
+    "amount_eur": 8.19,
+    "merchant": "App Store",
+    "geo_city": "Online",
+    "type": "online"
+  },
+  {
+    "date": "2025-12-05",
+    "amount_eur": 12.99,
+    "merchant": "Netflix",
+    "geo_city": "Online",
+    "type": "online"
+  },
+  {
+    "date": "2025-12-06",
+    "amount_eur": 8.99,
+    "merchant": "Apple Store",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-12-07",
+    "amount_eur": 2.34,
+    "merchant": "ING",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-12-08",
+    "amount_eur": 20.55,
+    "merchant": "Just Eat",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-12-09",
+    "amount_eur": 24.31,
+    "merchant": "NS Travel",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-12-09",
+    "amount_eur": 20.47,
+    "merchant": "Etos",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-12-10",
+    "amount_eur": 4.99,
+    "merchant": "Amazon Prime",
+    "geo_city": "Online",
+    "type": "online"
+  },
+  {
+    "date": "2025-12-12",
+    "amount_eur": 41.23,
+    "merchant": "Albert Heijn",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-12-12",
+    "amount_eur": 12.99,
+    "merchant": "Netflix",
+    "geo_city": "Online",
+    "type": "online"
+  },
+  {
+    "date": "2025-12-13",
+    "amount_eur": 9.5,
+    "merchant": "AH to go",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-12-13",
+    "amount_eur": 12.99,
+    "merchant": "Netflix",
+    "geo_city": "Online",
+    "type": "online"
+  },
+  {
+    "date": "2025-12-14",
+    "amount_eur": 74.54,
+    "merchant": "Nike Store",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-12-15",
+    "amount_eur": 7.68,
+    "merchant": "Starbucks",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-12-15",
+    "amount_eur": 1.53,
+    "merchant": "ING",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-12-17",
+    "amount_eur": 54.21,
+    "merchant": "Amazon.nl",
+    "geo_city": "Online",
+    "type": "online"
+  },
+  {
+    "date": "2025-12-17",
+    "amount_eur": 6.8,
+    "merchant": "Starbucks",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-12-17",
+    "amount_eur": 17.21,
+    "merchant": "Just Eat",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-12-20",
+    "amount_eur": 7.17,
+    "merchant": "Starbucks",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-12-22",
+    "amount_eur": 63.52,
+    "merchant": "Albert Heijn",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-12-22",
+    "amount_eur": 4.08,
+    "merchant": "ING",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-12-24",
+    "amount_eur": 26.72,
+    "merchant": "Amazon.nl",
+    "geo_city": "Online",
+    "type": "online"
+  },
+  {
+    "date": "2025-12-25",
+    "amount_eur": 34.92,
+    "merchant": "Heineken Pilsner Bar",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-12-28",
+    "amount_eur": 26.89,
+    "merchant": "NS Travel",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-12-29",
+    "amount_eur": 8.75,
+    "merchant": "McDonald's",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-12-30",
+    "amount_eur": 10.99,
+    "merchant": "Spotify",
+    "geo_city": "Online",
+    "type": "online"
+  },
+  {
+    "date": "2025-12-31",
+    "amount_eur": 57.04,
+    "merchant": "Albert Heijn",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2025-12-31",
+    "amount_eur": 13.4,
+    "merchant": "AH to go",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2026-01-01",
+    "amount_eur": 27.89,
+    "merchant": "Albert Heijn",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2026-01-05",
+    "amount_eur": 25.33,
+    "merchant": "Thuisbezorgd",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2026-01-06",
+    "amount_eur": 26.36,
+    "merchant": "Just Eat",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2026-01-07",
+    "amount_eur": 23.2,
+    "merchant": "Just Eat",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2026-01-07",
+    "amount_eur": 6.0,
+    "merchant": "NS Travel",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2026-01-08",
+    "amount_eur": 87.11,
+    "merchant": "Amazon.nl",
+    "geo_city": "Online",
+    "type": "online"
+  },
+  {
+    "date": "2026-01-10",
+    "amount_eur": 64.52,
+    "merchant": "Albert Heijn",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2026-01-11",
+    "amount_eur": 18.02,
+    "merchant": "Heineken Pilsner Bar",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2026-01-12",
+    "amount_eur": 7.15,
+    "merchant": "NS Travel",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2026-01-13",
+    "amount_eur": 39.56,
+    "merchant": "Brand Bier Cafe",
+    "geo_city": "Eindhoven",
+    "type": "card"
+  },
+  {
+    "date": "2026-01-13",
+    "amount_eur": 26.27,
+    "merchant": "Thuisbezorgd",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2026-01-15",
+    "amount_eur": 61.34,
+    "merchant": "Albert Heijn",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2026-01-15",
+    "amount_eur": 9.99,
+    "merchant": "AH to go",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2026-01-17",
+    "amount_eur": 1.87,
+    "merchant": "App Store",
+    "geo_city": "Online",
+    "type": "online"
+  },
+  {
+    "date": "2026-01-20",
+    "amount_eur": 39.46,
+    "merchant": "Albert Heijn",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2026-01-22",
+    "amount_eur": 17.08,
+    "merchant": "Etos",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2026-01-23",
+    "amount_eur": 7.29,
+    "merchant": "App Store",
+    "geo_city": "Online",
+    "type": "online"
+  },
+  {
+    "date": "2026-01-23",
+    "amount_eur": 89.54,
+    "merchant": "Amazon.nl",
+    "geo_city": "Online",
+    "type": "online"
+  },
+  {
+    "date": "2026-01-23",
+    "amount_eur": 4.71,
+    "merchant": "NS Travel",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2026-01-23",
+    "amount_eur": 10.07,
+    "merchant": "Etos",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2026-01-25",
+    "amount_eur": 23.54,
+    "merchant": "Albert Heijn",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2026-01-28",
+    "amount_eur": 17.14,
+    "merchant": "Apple Store",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2026-01-29",
+    "amount_eur": 80.16,
+    "merchant": "Amazon.nl",
+    "geo_city": "Online",
+    "type": "online"
+  },
+  {
+    "date": "2026-01-29",
+    "amount_eur": 4.99,
+    "merchant": "Amazon Prime",
+    "geo_city": "Online",
+    "type": "online"
+  },
+  {
+    "date": "2026-01-29",
+    "amount_eur": 2.02,
+    "merchant": "ING",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2026-01-29",
+    "amount_eur": 27.21,
+    "merchant": "Hema",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2026-01-31",
+    "amount_eur": 10.48,
+    "merchant": "Albert Heijn",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2026-01-31",
+    "amount_eur": 9.56,
+    "merchant": "AH to go",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2026-02-02",
+    "amount_eur": 10.99,
+    "merchant": "Spotify",
+    "geo_city": "Online",
+    "type": "online"
+  },
+  {
+    "date": "2026-02-02",
+    "amount_eur": 24.15,
+    "merchant": "Hema",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2026-02-02",
+    "amount_eur": 15.65,
+    "merchant": "Hema",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2026-02-03",
+    "amount_eur": 5.43,
+    "merchant": "NS Travel",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2026-02-04",
+    "amount_eur": 16.44,
+    "merchant": "McDonald's",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2026-02-06",
+    "amount_eur": 25.34,
+    "merchant": "NS Travel",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2026-02-07",
+    "amount_eur": 21.95,
+    "merchant": "Etos",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2026-02-11",
+    "amount_eur": 60.45,
+    "merchant": "Albert Heijn",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2026-02-11",
+    "amount_eur": 14.4,
+    "merchant": "Thuisbezorgd",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2026-02-11",
+    "amount_eur": 15.65,
+    "merchant": "Hema",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2026-02-14",
+    "amount_eur": 87.12,
+    "merchant": "Amazon.nl",
+    "geo_city": "Online",
+    "type": "online"
+  },
+  {
+    "date": "2026-02-16",
+    "amount_eur": 52.69,
+    "merchant": "Amazon.nl",
+    "geo_city": "Online",
+    "type": "online"
+  },
+  {
+    "date": "2026-02-17",
+    "amount_eur": 29.43,
+    "merchant": "Just Eat",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2026-02-20",
+    "amount_eur": 25.31,
+    "merchant": "Thuisbezorgd",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2026-02-23",
+    "amount_eur": 7.58,
+    "merchant": "McDonald's",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2026-02-23",
+    "amount_eur": 4.57,
+    "merchant": "NS Travel",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2026-02-25",
+    "amount_eur": 48.46,
+    "merchant": "Shell",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2026-02-26",
+    "amount_eur": 30.37,
+    "merchant": "Albert Heijn",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2026-02-27",
+    "amount_eur": 4.03,
+    "merchant": "Apple.com",
+    "geo_city": "Online",
+    "type": "online"
+  },
+  {
+    "date": "2026-02-27",
+    "amount_eur": 20.76,
+    "merchant": "Just Eat",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2026-02-27",
+    "amount_eur": 10.89,
+    "merchant": "Thuisbezorgd",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2026-02-28",
+    "amount_eur": 43.45,
+    "merchant": "Heineken Experience",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2026-02-28",
+    "amount_eur": 12.37,
+    "merchant": "Thuisbezorgd",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2026-03-05",
+    "amount_eur": 13.92,
+    "merchant": "AH to go",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2026-03-10",
+    "amount_eur": 70.69,
+    "merchant": "Amazon.nl",
+    "geo_city": "Online",
+    "type": "online"
+  },
+  {
+    "date": "2026-03-12",
+    "amount_eur": 24.09,
+    "merchant": "Just Eat",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2026-03-15",
+    "amount_eur": 24.3,
+    "merchant": "NS Travel",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2026-03-16",
+    "amount_eur": 53.14,
+    "merchant": "Albert Heijn",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2026-03-18",
+    "amount_eur": 1.97,
+    "merchant": "ING",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2026-03-19",
+    "amount_eur": 9.56,
+    "merchant": "Albert Heijn",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2026-03-19",
+    "amount_eur": 5.62,
+    "merchant": "AH to go",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2026-03-20",
+    "amount_eur": 25.55,
+    "merchant": "Hema",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2026-03-21",
+    "amount_eur": 18.71,
+    "merchant": "NS Travel",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2026-03-23",
+    "amount_eur": 2.36,
+    "merchant": "ING",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2026-03-25",
+    "amount_eur": 22.73,
+    "merchant": "Albert Heijn",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2026-03-25",
+    "amount_eur": 59.47,
+    "merchant": "Albert Heijn",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2026-03-25",
+    "amount_eur": 91.78,
+    "merchant": "Shell",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2026-03-26",
+    "amount_eur": 24.68,
+    "merchant": "Thuisbezorgd",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2026-03-26",
+    "amount_eur": 9.52,
+    "merchant": "Etos",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2026-03-28",
+    "amount_eur": 5.51,
+    "merchant": "App Store",
+    "geo_city": "Online",
+    "type": "online"
+  },
+  {
+    "date": "2026-03-29",
+    "amount_eur": 16.52,
+    "merchant": "McDonald's",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2026-04-06",
+    "amount_eur": 28.89,
+    "merchant": "Hema",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2026-04-07",
+    "amount_eur": 12.92,
+    "merchant": "McDonald's",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2026-04-08",
+    "amount_eur": 43.07,
+    "merchant": "Brand Bier Cafe",
+    "geo_city": "Eindhoven",
+    "type": "card"
+  },
+  {
+    "date": "2026-04-08",
+    "amount_eur": 16.22,
+    "merchant": "Just Eat",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2026-04-10",
+    "amount_eur": 12.99,
+    "merchant": "Netflix",
+    "geo_city": "Online",
+    "type": "online"
+  },
+  {
+    "date": "2026-04-10",
+    "amount_eur": 7.58,
+    "merchant": "Starbucks",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2026-04-11",
+    "amount_eur": 11.61,
+    "merchant": "Apple.com",
+    "geo_city": "Online",
+    "type": "online"
+  },
+  {
+    "date": "2026-04-13",
+    "amount_eur": 23.53,
+    "merchant": "Albert Heijn",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2026-04-16",
+    "amount_eur": 31.96,
+    "merchant": "Albert Heijn",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  },
+  {
+    "date": "2026-04-18",
+    "amount_eur": -0.56,
+    "merchant": "Brand Bier Cafe",
+    "geo_city": "Eindhoven",
+    "type": "card"
+  },
+  {
+    "date": "2026-04-23",
+    "amount_eur": 53.3,
+    "merchant": "Albert Heijn",
+    "geo_city": "Amsterdam",
+    "type": "card"
+  }
+]
