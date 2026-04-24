@@ -19,6 +19,7 @@ import os
 from datetime import datetime, timezone
 from pathlib import Path
 
+import asyncio
 import json as _json
 
 from dotenv import load_dotenv
@@ -29,17 +30,21 @@ from fastapi.responses import StreamingResponse
 load_dotenv()
 
 from backend.analyzers.consumer_panel import analyze_consumer_panel
+from backend.analyzers.user_text import analyze_user_text
 from backend.integrations import alpaca as alpaca_i
 from backend.integrations import bunq as bunq_i
 from backend.models import (
     AnalyzeRequest,
     ConsumerPanelForecast,
+    EvidenceRequest,
     InvestReceipt,
     InvestRequest,
     NearbyTicker,
     Report,
+    UserSource,
 )
 from backend.orchestrator import analyze_async, analyze_stream
+from backend.scrapers.user_evidence import fetch_url, passthrough_text
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("prospectus")
@@ -117,6 +122,40 @@ async def analyze_stream_route(req: AnalyzeRequest) -> StreamingResponse:
             "connection": "keep-alive",
         },
     )
+
+
+@app.post("/evidence", response_model=UserSource)
+async def evidence(req: EvidenceRequest) -> UserSource:
+    """Ingest a user-provided URL or text and return an analyzed UserSource."""
+    if req.source_type == "url":
+        if not req.url:
+            raise HTTPException(400, "url is required for source_type=url")
+        try:
+            extracted = await asyncio.to_thread(fetch_url, req.url)
+        except Exception as e:  # noqa: BLE001
+            raise HTTPException(400, f"failed to fetch url: {e}")
+    elif req.source_type == "text":
+        if not req.text:
+            raise HTTPException(400, "text is required for source_type=text")
+        extracted = passthrough_text(req.text)
+    else:
+        raise HTTPException(400, f"unsupported source_type {req.source_type}")
+
+    if not extracted.text.strip():
+        raise HTTPException(400, "no text could be extracted from the source")
+
+    src = await asyncio.to_thread(
+        analyze_user_text,
+        ticker=req.ticker,
+        company_name=req.company_name,
+        text=extracted.text,
+        title=extracted.title,
+        origin=extracted.origin,
+        user_note=req.user_note,
+        user_tag=req.user_tag,
+        source_type=req.source_type,
+    )
+    return src
 
 
 @app.post("/analyze", response_model=Report)

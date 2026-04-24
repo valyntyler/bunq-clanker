@@ -164,6 +164,30 @@ export async function bunqBalance(): Promise<BunqBalance> {
   return j<BunqBalance>(await fetch(`${BACKEND_URL}/balance`));
 }
 
+export type EvidenceTag = "supporting" | "contradicting" | "neutral";
+
+export interface EvidenceRequest {
+  ticker: string;
+  company_name?: string;
+  source_type: "url" | "text";
+  url?: string;
+  text?: string;
+  user_note?: string;
+  user_tag?: EvidenceTag;
+}
+
+export async function submitEvidence(
+  req: EvidenceRequest
+): Promise<UserSource> {
+  return j<UserSource>(
+    await fetch(`${BACKEND_URL}/evidence`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(req),
+    })
+  );
+}
+
 // ---- streaming analyze --------------------------------------------------
 
 export type AnalyzeEvent =

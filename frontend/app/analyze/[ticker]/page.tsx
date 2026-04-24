@@ -9,7 +9,9 @@ import {
   type ConsumerPanelForecast,
   type Report,
   type Section,
+  type UserSource,
 } from "@/lib/api";
+import { AddEvidenceModal } from "@/components/AddEvidenceModal";
 import { VerdictBanner } from "@/components/VerdictBanner";
 import { SectionCard } from "@/components/SectionCard";
 import { PanelForecastCard } from "@/components/PanelForecastCard";
@@ -47,6 +49,8 @@ export default function AnalyzePage() {
   const [pending, setPending] = useState(true);
   const [err, setErr] = useState<string | null>(null);
   const [investOpen, setInvestOpen] = useState(false);
+  const [evidenceOpen, setEvidenceOpen] = useState(false);
+  const [userSources, setUserSources] = useState<UserSource[]>([]);
   const startedAt = useRef<number>(0);
 
   useEffect(() => {
@@ -59,6 +63,7 @@ export default function AnalyzePage() {
     setSections({});
     setPanel(null);
     setBunqSpending(null);
+    setUserSources([]);
     setErr(null);
     setPending(true);
     startedAt.current = performance.now();
@@ -142,14 +147,22 @@ export default function AnalyzePage() {
         >
           ← back
         </a>
-        {report && (
+        <div className="flex gap-2">
           <button
-            onClick={() => setInvestOpen(true)}
-            className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500"
+            onClick={() => setEvidenceOpen(true)}
+            className="rounded-lg border border-violet-600 bg-violet-950/40 px-4 py-2 text-sm font-semibold text-violet-200 hover:bg-violet-900/50"
           >
-            Invest →
+            + Add evidence
           </button>
-        )}
+          {report && (
+            <button
+              onClick={() => setInvestOpen(true)}
+              className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500"
+            >
+              Invest →
+            </button>
+          )}
+        </div>
       </div>
 
       <TerminalLog lines={lines} />
@@ -184,6 +197,55 @@ export default function AnalyzePage() {
           <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
             {Object.entries(sections).map(([name, s]) => (
               <SectionCard key={name} name={name} section={s} />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {userSources.length > 0 && (
+        <section>
+          <h2 className="mb-3 text-xs font-mono uppercase tracking-wider text-violet-400">
+            Your sources
+          </h2>
+          <div className="space-y-2">
+            {userSources.map((u) => (
+              <div
+                key={u.source_id}
+                className="rounded-lg border border-violet-900/50 bg-violet-950/20 p-4"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-mono uppercase text-violet-400">
+                    {u.source_type} · {u.user_tag}
+                    {u.origin && (
+                      <a
+                        href={u.origin}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="ml-2 underline decoration-dotted"
+                      >
+                        link ↗
+                      </a>
+                    )}
+                  </span>
+                  <span className="text-xs font-mono text-violet-500">
+                    trust:{u.trust_level} · {u.score >= 0 ? "+" : ""}
+                    {u.score.toFixed(2)}
+                  </span>
+                </div>
+                {u.user_note && (
+                  <p className="mt-1 text-xs italic text-violet-300/80">
+                    "{u.user_note}"
+                  </p>
+                )}
+                <p className="mt-2 text-sm text-violet-100">{u.summary}</p>
+                {u.key_claims && u.key_claims.length > 0 && (
+                  <ul className="mt-2 space-y-0.5 text-xs text-violet-300/80">
+                    {u.key_claims.map((c, i) => (
+                      <li key={i}>· {c}</li>
+                    ))}
+                  </ul>
+                )}
+              </div>
             ))}
           </div>
         </section>
@@ -263,6 +325,14 @@ export default function AnalyzePage() {
           onClose={() => setInvestOpen(false)}
         />
       )}
+
+      <AddEvidenceModal
+        ticker={ticker}
+        companyName={report?.company_name}
+        open={evidenceOpen}
+        onClose={() => setEvidenceOpen(false)}
+        onAdded={(src) => setUserSources((prev) => [...prev, src])}
+      />
     </main>
   );
 }

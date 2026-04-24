@@ -126,6 +126,16 @@ class AnalyzeRequest(BaseModel):
     lng: float | None = None
 
 
+class EvidenceRequest(BaseModel):
+    ticker: str
+    company_name: str | None = None
+    source_type: Literal["url", "text"]
+    url: str | None = None
+    text: str | None = None
+    user_note: str = ""
+    user_tag: Literal["supporting", "contradicting", "neutral"] = "neutral"
+
+
 class InvestRequest(BaseModel):
     ticker: str
     amount_eur: float = Field(gt=0)
