@@ -773,6 +773,27 @@ export async function sendSplitRequests(args: {
   );
 }
 
+// ---- map: HQ locations + per-user verdict + spend overlay ------------
+
+export interface MapHq {
+  ticker: string;
+  name: string;
+  lat: number;
+  lng: number;
+  type: string;
+  verdict: "BUY" | "HOLD" | "AVOID" | null;
+  verdict_confidence: number | null;
+  verdict_at: string | null;
+  spend_eur: number;
+  invested_eur: number;
+}
+
+export async function locationsHqs(): Promise<{ hqs: MapHq[] }> {
+  return j<{ hqs: MapHq[] }>(
+    await authFetch(`${BACKEND_URL}/locations/hqs`)
+  );
+}
+
 // ---- live earnings-call co-pilot -------------------------------------
 
 export type CallTone =

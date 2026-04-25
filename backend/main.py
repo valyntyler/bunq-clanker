@@ -1898,6 +1898,71 @@ def _nearest_label(coords: tuple[float, float] | None) -> str | None:
     return f"{nearest['name']}, {nearest.get('type', 'hq')} ({int(best)}m)"
 
 
+@app.get("/locations/hqs")
+def locations_hqs(user: User = Depends(require_user)) -> dict:
+    """Full HQ registry for the map view. Each entry is enriched with the
+    user's most-recent verdict + total spend at that ticker so the map
+    can colour markers by verdict and size them by spend."""
+    rows = _load_hq_registry()
+    # Build verdict / spend lookups keyed by ticker.
+    from sqlmodel import Session as _S
+    from backend.db import engine as _engine, AnalysisRun as _AR, Investment as _IV
+
+    verdict_by_ticker: dict[str, dict] = {}
+    spend_by_ticker: dict[str, float] = {}
+    invested_by_ticker: dict[str, float] = {}
+    with _S(_engine) as s:
+        latest_runs = s.exec(
+            select(_AR)
+            .where(_AR.user_id == user.id)
+            .order_by(_AR.created_at.desc())
+            .limit(500)
+        ).all()
+        for r in latest_runs:
+            t = r.ticker
+            if not t or t in verdict_by_ticker:
+                continue
+            verdict_by_ticker[t] = {
+                "verdict": r.verdict,
+                "confidence": r.confidence,
+                "one_liner": r.one_liner,
+                "at": r.created_at.isoformat(),
+            }
+        invs = s.exec(select(_IV).where(_IV.user_id == user.id).limit(500)).all()
+        for r in invs:
+            t = r.ticker
+            if not t:
+                continue
+            invested_by_ticker[t] = invested_by_ticker.get(t, 0.0) + (r.amount_eur or 0.0)
+    # Personal-spending overlay (the same data /me/spending serves).
+    try:
+        from backend.analyzers.spending_insights import compute, to_dict
+        spend = to_dict(compute())
+        for r in spend.get("by_ticker") or []:
+            t = r.get("ticker")
+            if t:
+                spend_by_ticker[t] = float(r.get("spend_eur") or 0.0)
+    except Exception:  # noqa: BLE001
+        pass
+
+    enriched: list[dict] = []
+    for row in rows:
+        t = row.get("ticker")
+        enriched.append({
+            "ticker": t,
+            "name": row.get("name"),
+            "lat": row.get("lat"),
+            "lng": row.get("lng"),
+            "type": row.get("type", "hq"),
+            "verdict": (verdict_by_ticker.get(t) or {}).get("verdict"),
+            "verdict_confidence": (verdict_by_ticker.get(t) or {}).get("confidence"),
+            "verdict_at": (verdict_by_ticker.get(t) or {}).get("at"),
+            "spend_eur": round(spend_by_ticker.get(t, 0.0), 2),
+            "invested_eur": round(invested_by_ticker.get(t, 0.0), 2),
+        })
+    return {"hqs": enriched}
+
+
 @app.get("/nearby-tickers", response_model=list[NearbyTicker])
 def nearby_tickers(
     lat: float,

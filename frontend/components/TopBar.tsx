@@ -38,6 +38,11 @@ export function TopBar() {
           active={pathname?.startsWith("/scan") ?? false}
         />
         <NavLink
+          href="/map"
+          label="Map"
+          active={pathname?.startsWith("/map") ?? false}
+        />
+        <NavLink
           href="/receipts"
           label="Receipts"
           active={pathname?.startsWith("/receipts") ?? false}

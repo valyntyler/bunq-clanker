@@ -48,6 +48,7 @@ export type ProvenanceKind =
   | "index_options"
   | "newsroom"
   | "earnings_copilot"
+  | "map"
   | "verdict";
 
 interface ProvenanceMeta {
@@ -292,6 +293,15 @@ const REGISTRY: Record<ProvenanceKind, ProvenanceMeta> = {
     freshness: "Static fixture; refreshed when the analysis universe changes.",
     caveat:
       "Demo-grade fixture; in production this would be backed by a paid index-constituents data feed.",
+  },
+  map: {
+    label: "Map · HQ pins · per-user overlay",
+    what: "Every covered HQ as a pin on an OpenStreetMap basemap, coloured by your most-recent verdict (or grey if not yet analysed) and sized by how much you've spent at that company.",
+    source:
+      "backend/location/hq_registry.json (curated lat/lng for ~30 EU/US tickers) + your AnalysisRun + Investment + spending-insights rows server-side.",
+    method:
+      "GET /locations/hqs builds an enriched list per request; the map renders react-leaflet CircleMarkers with verdict-coloured fill and a log-scaled radius for spend.",
+    freshness: "HQ registry static; verdicts + spend pulled live on each map load.",
   },
   earnings_copilot: {
     label: "Earnings call · Claude live-scoring",
