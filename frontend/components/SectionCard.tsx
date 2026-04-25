@@ -1,3 +1,4 @@
+import { Markdown } from "@/components/Markdown";
 import type { Section } from "@/lib/api";
 
 function scoreColor(score: number) {
@@ -60,9 +61,10 @@ export function SectionCard({
             {section.score.toFixed(2)}
           </span>
         </div>
-        <p className="mt-2 text-sm leading-relaxed text-[var(--bunq-text)]/90">
-          {section.summary}
-        </p>
+        <Markdown
+          text={section.summary}
+          className="mt-2 text-sm leading-relaxed text-[var(--bunq-text)]/90"
+        />
 
         {extra.red_flags && extra.red_flags.length > 0 && (
           <FlagList variant="bad" label="red flags" items={extra.red_flags} />

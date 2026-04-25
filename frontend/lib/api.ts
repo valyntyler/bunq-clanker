@@ -264,6 +264,87 @@ export interface ResynthesizeRequest {
   location_context?: Report["location_context"];
 }
 
+// ---- per-user dashboard endpoints --------------------------------------
+
+export interface InvestmentRow {
+  id: string;
+  ticker: string;
+  company_name: string;
+  verdict: string;
+  amount_eur: number;
+  amount_usd: number;
+  fx_rate: number;
+  bunq_payment_id: string | null;
+  alpaca_order_id: string | null;
+  alpaca_symbol: string;
+  shares_estimated: number;
+  created_at: string;
+  alpaca?: {
+    status: string;
+    filled_qty: number;
+    filled_avg_price: number | null;
+    submitted_at: string | null;
+    filled_at: string | null;
+    symbol: string;
+    notional: number | null;
+  } | null;
+  current_price_usd?: number;
+  unrealized_pnl_usd?: number;
+  unrealized_pnl_pct?: number;
+}
+
+export interface InvestmentList {
+  investments: InvestmentRow[];
+  summary: {
+    count: number;
+    total_invested_eur: number;
+    total_unrealized_pnl_usd: number;
+  };
+}
+
+export async function meInvestments(enrich = true): Promise<InvestmentList> {
+  return j<InvestmentList>(
+    await authFetch(`${BACKEND_URL}/me/investments?enrich=${enrich}`)
+  );
+}
+
+export interface EvidenceRow {
+  id: string;
+  ticker: string;
+  company_name: string | null;
+  source_type: string;
+  origin: string | null;
+  user_note: string;
+  user_tag: string;
+  score: number;
+  summary: string;
+  trust_level: string;
+  created_at: string;
+}
+
+export async function meEvidence(): Promise<{ evidence: EvidenceRow[] }> {
+  return j<{ evidence: EvidenceRow[] }>(
+    await authFetch(`${BACKEND_URL}/me/evidence`)
+  );
+}
+
+export interface AnalysisRow {
+  id: string;
+  ticker: string;
+  company_name: string;
+  verdict: string;
+  confidence: number;
+  position_size_pct: number;
+  one_liner: string;
+  created_at: string;
+}
+
+export async function meAnalyses(): Promise<{ analyses: AnalysisRow[] }> {
+  return j<{ analyses: AnalysisRow[] }>(
+    await authFetch(`${BACKEND_URL}/me/analyses`)
+  );
+}
+
 export async function resynthesize(
   req: ResynthesizeRequest
 ): Promise<Report> {

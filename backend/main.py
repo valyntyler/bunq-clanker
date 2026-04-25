@@ -45,7 +45,16 @@ from backend.auth import (
     require_user,
     verify_password,
 )
-from backend.db import User, get_session, init_db
+from backend.db import (
+    AnalysisRun,
+    Investment,
+    User,
+    UserEvidence,
+    engine,
+    get_session,
+    init_db,
+)
+from sqlmodel import Session, select
 from backend.models import (
     AnalyzeRequest,
     AuthResponse,
@@ -62,7 +71,6 @@ from backend.models import (
     ResynthesizeRequest,
     UserSource,
 )
-from sqlmodel import Session, select
 from fastapi import Depends
 from backend.orchestrator import analyze_async, analyze_stream
 from backend.scrapers.compress import compress_audio, compress_image, compress_video
@@ -158,6 +166,93 @@ def auth_me(user: User = Depends(require_user)) -> dict:
         "id": user.id,
         "email": user.email,
         "created_at": user.created_at.isoformat(),
+    }
+
+
+# ---- per-user dashboard --------------------------------------------------
+
+
+@app.get("/me/investments")
+def me_investments(
+    user: User = Depends(require_user),
+    session: Session = Depends(get_session),
+    enrich: bool = True,
+) -> dict:
+    """List the user's invest receipts. When `enrich=true`, each one is
+    augmented with the Alpaca order's current status + fill data + last
+    trade price + unrealized P&L."""
+    rows = session.exec(
+        select(Investment)
+        .where(Investment.user_id == user.id)
+        .order_by(Investment.created_at.desc())
+        .limit(200)
+    ).all()
+    out: list[dict] = []
+    total_invested_eur = 0.0
+    total_unrealized_pnl_usd = 0.0
+    for r in rows:
+        d = r.model_dump()
+        d["created_at"] = r.created_at.isoformat()
+        total_invested_eur += r.amount_eur
+        if enrich and r.alpaca_order_id:
+            o = alpaca_i.get_order(r.alpaca_order_id)
+            d["alpaca"] = o
+            if o and o.get("filled_avg_price") and o.get("filled_qty"):
+                last = alpaca_i.latest_trade_price(r.alpaca_symbol)
+                if last:
+                    d["current_price_usd"] = last
+                    d["unrealized_pnl_usd"] = round(
+                        (last - o["filled_avg_price"]) * o["filled_qty"], 2
+                    )
+                    d["unrealized_pnl_pct"] = round(
+                        (last / o["filled_avg_price"] - 1) * 100, 2
+                    )
+                    total_unrealized_pnl_usd += d["unrealized_pnl_usd"]
+        out.append(d)
+    return {
+        "investments": out,
+        "summary": {
+            "count": len(out),
+            "total_invested_eur": round(total_invested_eur, 2),
+            "total_unrealized_pnl_usd": round(total_unrealized_pnl_usd, 2),
+        },
+    }
+
+
+@app.get("/me/evidence")
+def me_evidence(
+    user: User = Depends(require_user),
+    session: Session = Depends(get_session),
+) -> dict:
+    rows = session.exec(
+        select(UserEvidence)
+        .where(UserEvidence.user_id == user.id)
+        .order_by(UserEvidence.created_at.desc())
+        .limit(200)
+    ).all()
+    return {
+        "evidence": [
+            {**r.model_dump(), "created_at": r.created_at.isoformat()} for r in rows
+        ]
+    }
+
+
+@app.get("/me/analyses")
+def me_analyses(
+    user: User = Depends(require_user),
+    session: Session = Depends(get_session),
+    limit: int = 50,
+) -> dict:
+    rows = session.exec(
+        select(AnalysisRun)
+        .where(AnalysisRun.user_id == user.id)
+        .order_by(AnalysisRun.created_at.desc())
+        .limit(min(limit, 200))
+    ).all()
+    return {
+        "analyses": [
+            {**r.model_dump(), "created_at": r.created_at.isoformat()} for r in rows
+        ]
     }
 
 
@@ -336,6 +431,7 @@ async def evidence_upload(
     company_name: str | None = Form(None),
     file: UploadFile = File(...),
     user: User = Depends(require_user),
+    session: Session = Depends(get_session),
 ) -> UserSource:
     """Multipart upload for image / video / audio / pdf evidence."""
     if source_type not in MAX_UPLOAD_BYTES:
@@ -354,6 +450,8 @@ async def evidence_upload(
     if user_tag not in ("supporting", "contradicting", "neutral"):
         user_tag = "neutral"
 
+    src: UserSource | None = None
+
     if source_type == "image":
         compressed, ctype, stats = await asyncio.to_thread(compress_image, content)
         log.info(
@@ -361,7 +459,7 @@ async def evidence_upload(
             file.filename, stats["in_bytes"], stats["out_bytes"],
             100 * stats["ratio"], stats["elapsed_s"], stats["format"],
         )
-        return await asyncio.to_thread(
+        src = await asyncio.to_thread(
             analyze_user_image,
             ticker=ticker,
             company_name=company_name,
@@ -371,14 +469,14 @@ async def evidence_upload(
             user_tag=user_tag,  # type: ignore[arg-type]
             filename=file.filename,
         )
-    if source_type == "video":
+    elif source_type == "video":
         compressed, ctype, stats = await asyncio.to_thread(compress_video, content)
         log.info(
             "compress video %s: %d→%d bytes (%.1f%%) in %.1fs [%s]",
             file.filename, stats["in_bytes"], stats["out_bytes"],
             100 * stats["ratio"], stats["elapsed_s"], stats["format"],
         )
-        return await asyncio.to_thread(
+        src = await asyncio.to_thread(
             analyze_user_video,
             ticker=ticker,
             company_name=company_name,
@@ -389,14 +487,14 @@ async def evidence_upload(
             filename=file.filename,
             is_audio_only=False,
         )
-    if source_type == "audio":
+    elif source_type == "audio":
         compressed, ctype, stats = await asyncio.to_thread(compress_audio, content)
         log.info(
             "compress audio %s: %d→%d bytes (%.1f%%) in %.1fs [%s]",
             file.filename, stats["in_bytes"], stats["out_bytes"],
             100 * stats["ratio"], stats["elapsed_s"], stats["format"],
         )
-        return await asyncio.to_thread(
+        src = await asyncio.to_thread(
             analyze_user_video,
             ticker=ticker,
             company_name=company_name,
@@ -407,10 +505,9 @@ async def evidence_upload(
             filename=file.filename,
             is_audio_only=True,
         )
-    if source_type == "pdf":
-        # PDFs are already well-compressed; skip ffmpeg/PIL but log size
+    elif source_type == "pdf":
         log.info("pdf %s: %d bytes (no compression)", file.filename, len(content))
-        return await asyncio.to_thread(
+        src = await asyncio.to_thread(
             analyze_user_pdf,
             ticker=ticker,
             company_name=company_name,
@@ -419,12 +516,18 @@ async def evidence_upload(
             user_tag=user_tag,  # type: ignore[arg-type]
             filename=file.filename,
         )
-    raise HTTPException(500, f"unhandled source_type {source_type}")
+    else:
+        raise HTTPException(500, f"unhandled source_type {source_type}")
+
+    _persist_user_evidence(session, user, src, ticker, company_name)
+    return src
 
 
 @app.post("/evidence", response_model=UserSource)
 async def evidence(
-    req: EvidenceRequest, user: User = Depends(require_user)
+    req: EvidenceRequest,
+    user: User = Depends(require_user),
+    session: Session = Depends(get_session),
 ) -> UserSource:
     """Ingest a user-provided URL or text and return an analyzed UserSource."""
     if req.source_type == "url":
@@ -460,11 +563,45 @@ async def evidence(
         user_tag=req.user_tag,
         source_type=req.source_type,
     )
+    _persist_user_evidence(session, user, src, req.ticker, req.company_name)
     return src
 
 
+def _persist_user_evidence(
+    session: Session,
+    user: User,
+    src: UserSource,
+    ticker: str,
+    company_name: str | None,
+) -> None:
+    try:
+        session.add(
+            UserEvidence(
+                id=src.source_id,
+                user_id=user.id,
+                ticker=ticker.upper(),
+                company_name=company_name,
+                source_type=src.source_type,
+                origin=src.origin,
+                user_note=src.user_note,
+                user_tag=src.user_tag,
+                score=src.score,
+                summary=src.summary,
+                trust_level=src.trust_level,
+            )
+        )
+        session.commit()
+    except Exception:  # noqa: BLE001
+        log.exception("failed to persist UserEvidence row (non-fatal)")
+        session.rollback()
+
+
 @app.post("/analyze", response_model=Report)
-async def analyze(req: AnalyzeRequest, user: User = Depends(require_user)) -> Report:
+async def analyze(
+    req: AnalyzeRequest,
+    user: User = Depends(require_user),
+    session: Session = Depends(get_session),
+) -> Report:
     """Full pipeline: fundamentals + news + chart-vision + consumer_panel in
     parallel, then synthesized by Claude into a final verdict.
     """
@@ -479,7 +616,26 @@ async def analyze(req: AnalyzeRequest, user: User = Depends(require_user)) -> Re
     coords = (req.lat, req.lng) if req.lat is not None and req.lng is not None else None
     # Location label comes from the nearest HQ hit if coords are present.
     location_label = _nearest_label(coords) if coords else None
-    return await analyze_async(ticker_upper, coords=coords, location_label=location_label)
+    report = await analyze_async(
+        ticker_upper, coords=coords, location_label=location_label
+    )
+    try:
+        session.add(
+            AnalysisRun(
+                user_id=user.id,
+                ticker=report.ticker,
+                company_name=report.company_name,
+                verdict=report.verdict,
+                confidence=report.confidence,
+                position_size_pct=report.position_size_pct,
+                one_liner=report.one_liner,
+            )
+        )
+        session.commit()
+    except Exception:  # noqa: BLE001
+        log.exception("failed to persist AnalysisRun (non-fatal)")
+        session.rollback()
+    return report
 
 
 def _nearest_label(coords: tuple[float, float] | None) -> str | None:
@@ -556,7 +712,11 @@ def balance(user: User = Depends(require_user)) -> dict:
 
 
 @app.post("/invest", response_model=InvestReceipt)
-def invest(req: InvestRequest, user: User = Depends(require_user)) -> InvestReceipt:
+def invest(
+    req: InvestRequest,
+    user: User = Depends(require_user),
+    session: Session = Depends(get_session),
+) -> InvestReceipt:
     """1) Top-up Bunq Main from sugardaddy if needed.
        2) Transfer EUR Main → Prospectus Investments pot.
        3) Submit an Alpaca paper market-buy at the mapped US-ADR symbol.
@@ -595,7 +755,7 @@ def invest(req: InvestRequest, user: User = Depends(require_user)) -> InvestRece
     except Exception as e:  # noqa: BLE001
         log.warning("alpaca buy failed (non-fatal): %s", e)
 
-    return InvestReceipt(
+    receipt = InvestReceipt(
         bunq_payment_id=bunq_payment_id,
         alpaca_order_id=alpaca_order_id,
         ticker=req.ticker.upper(),
@@ -609,3 +769,23 @@ def invest(req: InvestRequest, user: User = Depends(require_user)) -> InvestRece
             "note": "sandbox Bunq + Alpaca paper",
         },
     )
+    # Persist for the user's dashboard
+    try:
+        session.add(
+            Investment(
+                user_id=user.id,
+                ticker=req.ticker.upper(),
+                amount_eur=req.amount_eur,
+                amount_usd=round(amount_usd, 2),
+                fx_rate=FX_EUR_USD,
+                bunq_payment_id=bunq_payment_id,
+                alpaca_order_id=alpaca_order_id,
+                alpaca_symbol=alpaca_symbol,
+                shares_estimated=shares,
+            )
+        )
+        session.commit()
+    except Exception:  # noqa: BLE001
+        log.exception("failed to persist Investment row (non-fatal)")
+        session.rollback()
+    return receipt

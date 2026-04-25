@@ -1,3 +1,4 @@
+import { Markdown } from "@/components/Markdown";
 import type { Report } from "@/lib/api";
 
 const SCHEMES: Record<
@@ -49,9 +50,10 @@ export function VerdictBanner({ report }: { report: Report }) {
           <div className="mt-1 bunq-numeral text-[64px] font-black leading-none">
             {report.verdict}
           </div>
-          <p className="mt-3 max-w-2xl text-sm leading-relaxed opacity-90">
-            {report.one_liner}
-          </p>
+          <Markdown
+            text={report.one_liner}
+            className="mt-3 max-w-2xl text-sm leading-relaxed opacity-90"
+          />
         </div>
 
         <div className="shrink-0 text-right text-[12px]">

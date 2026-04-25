@@ -16,6 +16,7 @@ import {
 import { AddEvidenceModal } from "@/components/AddEvidenceModal";
 import { AuthGuard } from "@/components/AuthGuard";
 import { ChatPanel } from "@/components/ChatPanel";
+import { Markdown } from "@/components/Markdown";
 import { VerdictBanner } from "@/components/VerdictBanner";
 import { SectionCard } from "@/components/SectionCard";
 import { PanelForecastCard } from "@/components/PanelForecastCard";
@@ -336,9 +337,10 @@ function AnalyzePage() {
                     "{u.user_note}"
                   </p>
                 )}
-                <p className="mt-2 text-sm text-[var(--bunq-text)]/90">
-                  {u.summary}
-                </p>
+                <Markdown
+                  text={u.summary}
+                  className="mt-2 text-sm text-[var(--bunq-text)]/90"
+                />
                 {u.key_claims && u.key_claims.length > 0 && (
                   <ul className="mt-2 space-y-0.5 text-xs text-[var(--bunq-muted)]">
                     {u.key_claims.map((c, i) => (
@@ -423,9 +425,10 @@ function AnalyzePage() {
                         </div>
                       </div>
                     </div>
-                    <p className="mt-2 text-sm text-[var(--bunq-text)]/90">
-                      {g.reasoning}
-                    </p>
+                    <Markdown
+                      text={g.reasoning}
+                      className="mt-2 text-sm text-[var(--bunq-text)]/90"
+                    />
                     {g.transcript_excerpt && (
                       <blockquote
                         className="mt-2 border-l-2 pl-3 text-xs italic text-[var(--bunq-muted)]"
@@ -469,7 +472,10 @@ function AnalyzePage() {
             }}
           >
             {report.conflicts.map((c, i) => (
-              <li key={i}>· {c}</li>
+              <li key={i} className="flex gap-2">
+                <span>·</span>
+                <Markdown text={c} inline />
+              </li>
             ))}
           </ul>
         </section>
@@ -482,7 +488,10 @@ function AnalyzePage() {
           </h2>
           <ul className="space-y-1 text-sm text-[var(--bunq-muted)]">
             {report.risks.map((r, i) => (
-              <li key={i}>· {r}</li>
+              <li key={i} className="flex gap-2">
+                <span>·</span>
+                <Markdown text={r} inline />
+              </li>
             ))}
           </ul>
         </section>

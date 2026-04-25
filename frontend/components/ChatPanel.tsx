@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { Markdown } from "@/components/Markdown";
 import { chatStream, type ChatTurn, type Report } from "@/lib/api";
 
 const SUGGESTIONS = [
@@ -177,7 +178,7 @@ function Bubble({
   return (
     <div className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
       <div
-        className="max-w-[85%] whitespace-pre-wrap rounded-2xl px-4 py-2 text-sm leading-relaxed"
+        className="max-w-[85%] rounded-2xl px-4 py-2 text-sm leading-relaxed"
         style={
           isUser
             ? { background: "var(--bunq-green)", color: "#0a0d05" }
@@ -188,7 +189,7 @@ function Bubble({
               }
         }
       >
-        {turn.content}
+        <Markdown text={turn.content} />
         {streaming && (
           <span
             className="ml-1 inline-block h-3 w-1.5 animate-pulse align-middle"

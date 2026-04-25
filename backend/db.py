@@ -31,6 +31,58 @@ class User(SQLModel, table=True):
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
+class Investment(SQLModel, table=True):
+    """Persisted /invest receipts. One row per money-move."""
+
+    id: str = Field(default_factory=lambda: uuid.uuid4().hex, primary_key=True)
+    user_id: str = Field(foreign_key="user.id", index=True)
+    ticker: str = Field(index=True)
+    company_name: str = ""
+    verdict: str = ""              # snapshot at the time of investment
+    confidence: float = 0.0
+    amount_eur: float
+    amount_usd: float
+    fx_rate: float
+    bunq_payment_id: str | None = None
+    alpaca_order_id: str | None = None
+    alpaca_symbol: str = ""
+    shares_estimated: float = 0.0
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), index=True)
+
+
+class UserEvidence(SQLModel, table=True):
+    """Persisted user-submitted sources (URL/text/image/video/audio/PDF)."""
+
+    id: str = Field(primary_key=True)  # mirrors UserSource.source_id
+    user_id: str = Field(foreign_key="user.id", index=True)
+    ticker: str = Field(index=True)
+    company_name: str | None = None
+    source_type: str
+    origin: str | None = None  # presigned S3 URL or external URL
+    user_note: str = ""
+    user_tag: str = "neutral"
+    score: float = 0.0
+    summary: str = ""
+    trust_level: str = "medium"
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), index=True)
+
+
+class AnalysisRun(SQLModel, table=True):
+    """Lightweight log of every /analyze call — verdict + one_liner only,
+    not the full Report (which is large and rebuildable). Lets the user
+    scroll back through what they've researched."""
+
+    id: str = Field(default_factory=lambda: uuid.uuid4().hex, primary_key=True)
+    user_id: str = Field(foreign_key="user.id", index=True)
+    ticker: str = Field(index=True)
+    company_name: str = ""
+    verdict: str = ""
+    confidence: float = 0.0
+    position_size_pct: float = 0.0
+    one_liner: str = ""
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), index=True)
+
+
 def init_db() -> None:
     SQLModel.metadata.create_all(engine)
 

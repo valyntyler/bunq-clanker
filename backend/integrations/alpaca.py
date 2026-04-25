@@ -49,6 +49,32 @@ def _data_client():
     )
 
 
+def get_order(order_id: str) -> dict | None:
+    """Returns a dict with status / filled_qty / filled_avg_price for a paper order.
+
+    None on lookup failure (we don't want a stale alpaca state to break the
+    dashboard).
+    """
+    try:
+        from alpaca.common.exceptions import APIError  # noqa: F401
+
+        o = _trading_client().get_order_by_id(order_id)
+        return {
+            "status": str(o.status).split(".")[-1].lower(),
+            "filled_qty": float(o.filled_qty) if o.filled_qty else 0.0,
+            "filled_avg_price": float(o.filled_avg_price)
+            if o.filled_avg_price
+            else None,
+            "submitted_at": str(o.submitted_at) if o.submitted_at else None,
+            "filled_at": str(o.filled_at) if o.filled_at else None,
+            "symbol": o.symbol,
+            "notional": float(o.notional) if o.notional else None,
+        }
+    except Exception as e:  # noqa: BLE001
+        log.warning("alpaca get_order(%s) failed: %s", order_id, e)
+        return None
+
+
 def get_account() -> dict:
     acct = _trading_client().get_account()
     return {
