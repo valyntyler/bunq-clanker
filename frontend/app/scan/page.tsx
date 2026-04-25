@@ -33,8 +33,10 @@ interface ArHit {
   box: { x: number; y: number; w: number; h: number } | null;
 }
 
-const AR_FRAME_INTERVAL_MS = 2500;
-const AR_HIT_TTL_MS = 6000; // detections fade out N ms after their last refresh
+const AR_FRAME_INTERVAL_MS = 1500;
+const AR_HIT_TTL_MS = 7000; // detections fade out N ms after their last refresh
+const AR_STALE_AFTER_MS = 2000; // boxes "age" visually after this long without a refresh
+const AR_MIN_CONFIDENCE = 0.6;  // hide flaky / hallucinated brands from the HUD
 
 function ScanPage() {
   // The two capture paths:
@@ -58,6 +60,11 @@ function ScanPage() {
   const [arHits, setArHits] = useState<Record<string, ArHit>>({});
   const arBusyRef = useRef(false); // skip new captures while one's in flight
   const arTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const arInflightRef = useRef<AbortController | null>(null);
+  // Track the resolution of the last frame we ACTUALLY sent to Claude so the
+  // returned box coords are scaled against that exact frame, not whatever
+  // the live video resolution happens to be by the time the response lands.
+  const arFrameDimsRef = useRef<{ w: number; h: number } | null>(null);
   const [arBackendBusy, setArBackendBusy] = useState(false);
   const [arError, setArError] = useState<string | null>(null);
   // Re-render every second so TTL-based fading is reactive even when no
@@ -151,30 +158,46 @@ function ScanPage() {
       if (!v || v.videoWidth === 0) return;
       arBusyRef.current = true;
       setArBackendBusy(true);
+
+      // Abort any prior request that's somehow still hanging.
+      arInflightRef.current?.abort();
+      const controller = new AbortController();
+      arInflightRef.current = controller;
+
       try {
+        const w = v.videoWidth;
+        const h = v.videoHeight;
+        arFrameDimsRef.current = { w, h };
         const canvas = document.createElement("canvas");
-        canvas.width = v.videoWidth;
-        canvas.height = v.videoHeight;
+        canvas.width = w;
+        canvas.height = h;
         const ctx = canvas.getContext("2d");
         if (!ctx) return;
-        ctx.drawImage(v, 0, 0, canvas.width, canvas.height);
+        ctx.drawImage(v, 0, 0, w, h);
         const blob = await new Promise<Blob | null>((resolve) =>
           canvas.toBlob(resolve, "image/jpeg", 0.7),
         );
-        if (!blob) return;
+        if (!blob || controller.signal.aborted) return;
         const r = await scanImage(
           new File([blob], "ar.jpg", { type: "image/jpeg" }),
         );
+        if (controller.signal.aborted) return;
         setArError(null);
         const now = Date.now();
         setArHits((prev) => {
           const next = { ...prev };
+          // Track which tickers landed in this response — used to drop ones
+          // we previously had but didn't see this round (after a grace TTL).
+          const seen = new Set<string>();
           for (const d of r.detections) {
             if (!d.is_listed || !d.ticker) continue;
+            if (d.confidence < AR_MIN_CONFIDENCE) continue;
+            if (!d.box) continue; // AR HUD strictly requires a box
+            seen.add(d.ticker);
             next[d.ticker] = {
               detection: d,
               lastSeen: now,
-              box: d.box ?? prev[d.ticker]?.box ?? null,
+              box: d.box,
             };
           }
           // Drop expired entries.
@@ -184,7 +207,9 @@ function ScanPage() {
           return next;
         });
       } catch (e) {
-        setArError((e as Error).message);
+        if ((e as Error).name !== "AbortError") {
+          setArError((e as Error).message);
+        }
       } finally {
         arBusyRef.current = false;
         setArBackendBusy(false);
@@ -198,6 +223,8 @@ function ScanPage() {
         clearInterval(arTimerRef.current);
         arTimerRef.current = null;
       }
+      arInflightRef.current?.abort();
+      arInflightRef.current = null;
     };
   }, [mode, liveOn]);
 
@@ -277,11 +304,13 @@ function ScanPage() {
                 playsInline
                 muted
                 className="aspect-video w-full rounded-2xl bg-black"
+                style={{ objectFit: "contain" }}
               />
               {mode === "ar" && (
                 <ArOverlay
                   hits={arHits}
                   busy={arBackendBusy}
+                  videoRef={videoRef}
                 />
               )}
             </div>
@@ -515,18 +544,99 @@ function ModeToggle({
   );
 }
 
+/** Geometry of where the video stream is actually painted inside its
+ *  element — accounts for object-fit:contain letterboxing, so AR overlays
+ *  line up with the visible image instead of with the element bounds. */
+interface VideoRect {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+  ready: boolean;
+}
+
+function useVideoRenderRect(
+  videoRef: React.RefObject<HTMLVideoElement | null>,
+): VideoRect {
+  const [rect, setRect] = useState<VideoRect>({
+    left: 0,
+    top: 0,
+    width: 0,
+    height: 0,
+    ready: false,
+  });
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v) return;
+    let raf = 0;
+    function compute() {
+      const v2 = videoRef.current;
+      if (!v2) return;
+      const er = v2.getBoundingClientRect();
+      const cw = er.width;
+      const ch = er.height;
+      const vw = v2.videoWidth || 1;
+      const vh = v2.videoHeight || 1;
+      // object-fit: contain — fit inside, preserving aspect ratio.
+      const elAR = cw / ch;
+      const vidAR = vw / vh;
+      let w: number, h: number, l: number, t: number;
+      if (vidAR > elAR) {
+        // letterbox top/bottom
+        w = cw;
+        h = cw / vidAR;
+        l = 0;
+        t = (ch - h) / 2;
+      } else {
+        // letterbox left/right
+        h = ch;
+        w = ch * vidAR;
+        l = (cw - w) / 2;
+        t = 0;
+      }
+      setRect({ left: l, top: t, width: w, height: h, ready: vw > 1 && vh > 1 });
+    }
+    compute();
+    // Recompute on resize + when the stream metadata lands (videoWidth
+    // becomes non-zero only after loadedmetadata).
+    const onMeta = () => {
+      raf = requestAnimationFrame(compute);
+    };
+    const onResize = () => {
+      raf = requestAnimationFrame(compute);
+    };
+    v.addEventListener("loadedmetadata", onMeta);
+    window.addEventListener("resize", onResize);
+    const ro = new ResizeObserver(() => {
+      raf = requestAnimationFrame(compute);
+    });
+    ro.observe(v);
+    return () => {
+      v.removeEventListener("loadedmetadata", onMeta);
+      window.removeEventListener("resize", onResize);
+      ro.disconnect();
+      if (raf) cancelAnimationFrame(raf);
+    };
+  }, [videoRef]);
+  return rect;
+}
+
 /** Absolute-positioned overlay for AR mode — renders one floating pill per
- *  detected branded item, anchored to its bounding box (or the centre of
- *  the frame if Claude didn't return a usable box). Detections fade out
+ *  detected branded item, anchored to its bounding box. Boxes are positioned
+ *  inside the actual displayed-video rect (letterbox-aware), not the element
+ *  bounds, so they line up with what the user sees. Detections fade out
  *  AR_HIT_TTL_MS after their last refresh so the HUD doesn't pile up
  *  stale items as the camera moves. */
 function ArOverlay({
   hits,
   busy,
+  videoRef,
 }: {
   hits: Record<string, ArHit>;
   busy: boolean;
+  videoRef: React.RefObject<HTMLVideoElement | null>;
 }) {
+  const renderRect = useVideoRenderRect(videoRef);
   const now = Date.now();
   const items = Object.values(hits);
   return (
@@ -564,75 +674,95 @@ function ArOverlay({
         </div>
       )}
 
-      {items.map((hit) => (
-        <ArHitOverlay key={hit.detection.ticker} hit={hit} now={now} />
-      ))}
+      {renderRect.ready &&
+        items.map((hit) => (
+          <ArHitOverlay
+            key={hit.detection.ticker}
+            hit={hit}
+            now={now}
+            videoRect={renderRect}
+          />
+        ))}
     </div>
   );
 }
 
-function ArHitOverlay({ hit, now }: { hit: ArHit; now: number }) {
+function ArHitOverlay({
+  hit,
+  now,
+  videoRect,
+}: {
+  hit: ArHit;
+  now: number;
+  videoRect: VideoRect;
+}) {
   const age = now - hit.lastSeen;
   const ttl = AR_HIT_TTL_MS;
-  // Linear opacity fall-off in the last 1.5 seconds before TTL expiry so the
+  const stale = age > AR_STALE_AFTER_MS;
+  // Linear opacity fall-off in the last 1.5s before TTL expiry so the
   // overlay doesn't pop out abruptly.
   const fade = Math.max(0, Math.min(1, (ttl - age) / 1500));
+  // Stale-but-not-yet-fading: dim the box a bit so it's clear the position
+  // is from the last successful detection, not the current frame.
+  const visualAlpha = stale ? fade * 0.55 : fade;
   const d = hit.detection;
   const box = hit.box;
 
-  // Position: prefer the bounding box; otherwise float a centred pill.
+  // Translate box (fractions of the captured frame) into pixel coords inside
+  // the visible video region. This is the alignment fix.
   const positionStyle: React.CSSProperties = box
     ? {
-        left: `${box.x * 100}%`,
-        top: `${box.y * 100}%`,
-        width: `${box.w * 100}%`,
-        height: `${box.h * 100}%`,
+        left: `${videoRect.left + box.x * videoRect.width}px`,
+        top: `${videoRect.top + box.y * videoRect.height}px`,
+        width: `${box.w * videoRect.width}px`,
+        height: `${box.h * videoRect.height}px`,
       }
     : {
-        left: "10%",
-        top: "10%",
-        width: "80%",
-        height: "80%",
+        left: `${videoRect.left + videoRect.width * 0.1}px`,
+        top: `${videoRect.top + videoRect.height * 0.1}px`,
+        width: `${videoRect.width * 0.8}px`,
+        height: `${videoRect.height * 0.8}px`,
       };
 
-  // Verdict colouring is opt-in: until we wire a quick-verdict cache, every
-  // detected ticker just shows the brand → parent chip + tap-to-analyse CTA.
+  const accent = stale ? "rgba(181,255,0,0.55)" : "var(--bunq-green)";
+
   return (
     <Link
       href={`/analyze/${encodeURIComponent(d.ticker)}`}
       className="pointer-events-auto absolute"
       style={{
         ...positionStyle,
-        opacity: fade,
-        transition: "opacity 250ms linear",
+        opacity: visualAlpha,
+        // Smooth box repositioning between successive detections so nothing
+        // pops; short enough to not feel laggy.
+        transition: "left 220ms ease-out, top 220ms ease-out, width 220ms ease-out, height 220ms ease-out, opacity 200ms linear",
       }}
       title={`Analyse ${d.company || d.ticker}`}
     >
-      {/* Bounding-box outline */}
       {box && (
         <div
           className="absolute inset-0 rounded-xl"
           style={{
-            border: "1.5px solid var(--bunq-green)",
+            border: `1.5px ${stale ? "dashed" : "solid"} ${accent}`,
             boxShadow:
               "0 0 0 1px rgba(0,0,0,0.55), 0 6px 24px -6px rgba(181,255,0,0.45)",
-            background: "rgba(181,255,0,0.04)",
+            background: stale ? "transparent" : "rgba(181,255,0,0.04)",
           }}
         />
       )}
-      {/* Pill anchored to top-left of the box */}
       <div
         className="absolute -top-2 left-2 flex items-center gap-2 rounded-full px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.16em]"
         style={{
           background: "rgba(8,10,5,0.86)",
-          color: "var(--bunq-green)",
-          border: "1px solid rgba(181,255,0,0.45)",
+          color: accent,
+          border: `1px solid ${accent}`,
           backdropFilter: "blur(6px)",
           whiteSpace: "nowrap",
         }}
       >
         <span className="bunq-numeral font-bold">{d.ticker}</span>
         <span className="opacity-80">{d.brand || d.object}</span>
+        {stale && <span className="opacity-60">·tracking</span>}
         <span className="opacity-70">↗</span>
       </div>
     </Link>
