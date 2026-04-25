@@ -49,6 +49,7 @@ export type ProvenanceKind =
   | "newsroom"
   | "earnings_copilot"
   | "map"
+  | "rebalance"
   | "verdict";
 
 interface ProvenanceMeta {
@@ -293,6 +294,17 @@ const REGISTRY: Record<ProvenanceKind, ProvenanceMeta> = {
     freshness: "Static fixture; refreshed when the analysis universe changes.",
     caveat:
       "Demo-grade fixture; in production this would be backed by a paid index-constituents data feed.",
+  },
+  rebalance: {
+    label: "Spend × position cross-tab",
+    what: "Per-ticker comparison of how much you've spent at the company's merchants vs how much you've invested in the ticker. Surfaces alignment gaps as actionable rebalance suggestions.",
+    source:
+      "Your Bunq spending insights (12-month sandbox payments matched to merchant aliases) cross-joined with your Sauron Investment rows + most-recent AnalysisRun verdict per ticker.",
+    method:
+      "Per-ticker classification: underweight (invested < spend × 0.5 AND spend ≥ €50), aligned (invested ∈ [spend×0.5, spend×5]), overweight (invested > spend × 5), position_only (invested but no matching spend). Suggested delta = max(spend − invested) for underweight rows.",
+    freshness: "Pulled live on dashboard load.",
+    caveat:
+      "This is a wallet-conviction signal, not financial advice. Suggested deltas are informational; you decide whether to act.",
   },
   map: {
     label: "Map · HQ pins · per-user overlay",

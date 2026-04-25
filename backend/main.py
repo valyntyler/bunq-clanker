@@ -630,6 +630,200 @@ async def trending(
     }
 
 
+@app.get("/me/rebalance")
+def me_rebalance(
+    user: User = Depends(require_user),
+    session: Session = Depends(get_session),
+) -> dict:
+    """Cross-tab the user's spending modality with their actual positions
+    to surface alignment gaps. The thesis: if Bunq panel data predicts
+    revenue (which is the alt-data hypothesis the whole app is built on),
+    your *own* spend predicts your conviction in a brand. Mismatches
+    between your wallet and your portfolio are the most actionable signal
+    we can give a retail user.
+
+    Per-ticker classification (vs annual spend at the company's merchants):
+        underweight   — invested < spend × 0.5 AND spend >= €50
+        aligned       — invested ∈ [spend × 0.5, spend × 5]
+        overweight    — invested > spend × 5
+        position_only — invested > 0 AND spend == 0  (informational)
+
+    Returns a list sorted by |suggested_delta_eur| desc — biggest gaps
+    first, so the dashboard card surfaces the most-actionable nudge.
+    """
+    from backend.analyzers.spending_insights import compute, to_dict
+
+    spend_data = to_dict(compute())
+    spend_by_ticker: dict[str, dict] = {}
+    for row in spend_data.get("by_ticker") or []:
+        t = (row.get("ticker") or "").upper()
+        if not t:
+            continue
+        spend_by_ticker[t] = {
+            "spend_eur": float(row.get("spend_eur") or 0.0),
+            "visit_count": int(row.get("count") or 0),
+            "category": row.get("category") or "",
+        }
+
+    inv_rows = session.exec(
+        select(Investment).where(Investment.user_id == user.id).limit(500)
+    ).all()
+    invest_by_ticker: dict[str, dict] = {}
+    for r in inv_rows:
+        t = (r.ticker or "").upper()
+        if not t:
+            continue
+        slot = invest_by_ticker.setdefault(
+            t,
+            {
+                "invested_eur": 0.0,
+                "ticker_pots": set(),
+                "company_name": r.company_name or "",
+                "last_at": r.created_at,
+            },
+        )
+        slot["invested_eur"] += float(r.amount_eur or 0.0)
+        if r.bunq_pot_id:
+            slot["ticker_pots"].add(r.bunq_pot_id)
+        if r.created_at and (slot["last_at"] is None or r.created_at > slot["last_at"]):
+            slot["last_at"] = r.created_at
+
+    # Latest verdict per ticker — gives the suggestion an opinion to lean on.
+    runs = session.exec(
+        select(AnalysisRun)
+        .where(AnalysisRun.user_id == user.id)
+        .order_by(AnalysisRun.created_at.desc())
+        .limit(500)
+    ).all()
+    verdict_by_ticker: dict[str, dict] = {}
+    for r in runs:
+        t = (r.ticker or "").upper()
+        if not t or t in verdict_by_ticker:
+            continue
+        verdict_by_ticker[t] = {
+            "verdict": r.verdict,
+            "confidence": r.confidence,
+            "company_name": r.company_name,
+        }
+
+    suggestions: list[dict] = []
+    seen: set[str] = set()
+    for t in set(spend_by_ticker) | set(invest_by_ticker):
+        if t in seen:
+            continue
+        seen.add(t)
+        spend = spend_by_ticker.get(t, {})
+        inv = invest_by_ticker.get(t, {})
+        verdict = verdict_by_ticker.get(t, {})
+        spend_eur = float(spend.get("spend_eur") or 0.0)
+        invested_eur = float(inv.get("invested_eur") or 0.0)
+
+        # Signal classification — see docstring.
+        if spend_eur >= 50 and invested_eur < spend_eur * 0.5:
+            signal = "underweight"
+            suggested_delta = round(spend_eur - invested_eur, 0)
+        elif spend_eur > 0 and invested_eur > spend_eur * 5:
+            signal = "overweight"
+            suggested_delta = round(spend_eur * 2 - invested_eur, 0)  # negative — trim
+        elif spend_eur == 0 and invested_eur > 0:
+            signal = "position_only"
+            suggested_delta = 0
+        elif spend_eur >= 50:
+            signal = "aligned"
+            suggested_delta = 0
+        else:
+            # Skip tiny / no-signal rows.
+            continue
+
+        # Suggestion text — what we tell the user.
+        if signal == "underweight":
+            verdict_clause = ""
+            v = (verdict.get("verdict") or "").upper()
+            if v == "BUY":
+                verdict_clause = (
+                    f" Your most-recent analysis backs it (BUY, conf "
+                    f"{verdict.get('confidence', 0):.2f})."
+                )
+            elif v == "AVOID":
+                verdict_clause = (
+                    f" But your most-recent analysis was AVOID — read it "
+                    f"first."
+                )
+            elif v == "HOLD":
+                verdict_clause = (
+                    f" Your last analysis was HOLD; this would tilt you "
+                    f"toward the brand."
+                )
+            rationale = (
+                f"You spend €{spend_eur:.0f}/yr at {t} venues but only have "
+                f"€{invested_eur:.0f} invested. Your wallet says you back "
+                f"this brand; your portfolio doesn't reflect that.{verdict_clause}"
+            )
+        elif signal == "overweight":
+            rationale = (
+                f"You're €{invested_eur:.0f} into {t} but only spend "
+                f"€{spend_eur:.0f}/yr there. Position is "
+                f"{invested_eur / spend_eur:.0f}× your annual spend — "
+                f"sized large vs your personal conviction signal."
+            )
+        elif signal == "position_only":
+            rationale = (
+                f"You hold €{invested_eur:.0f} of {t} but spend nothing at "
+                f"the brand's merchants. Could be deliberate (you bought "
+                f"on fundamentals, not affinity) — informational."
+            )
+        else:  # aligned
+            rationale = (
+                f"€{invested_eur:.0f} invested vs €{spend_eur:.0f}/yr "
+                f"spend — your wallet and portfolio agree on {t}."
+            )
+
+        suggestions.append({
+            "ticker": t,
+            "company_name": (
+                inv.get("company_name") or verdict.get("company_name") or t
+            ),
+            "spend_eur": round(spend_eur, 2),
+            "visit_count": int(spend.get("visit_count") or 0),
+            "category": spend.get("category") or "",
+            "invested_eur": round(invested_eur, 2),
+            "ratio": (
+                round(invested_eur / spend_eur, 2) if spend_eur > 0 else None
+            ),
+            "signal": signal,
+            "suggested_delta_eur": float(suggested_delta),
+            "rationale": rationale,
+            "verdict": verdict.get("verdict"),
+            "verdict_confidence": verdict.get("confidence"),
+        })
+
+    suggestions.sort(
+        key=lambda s: (
+            # underweight first (positive deltas), then position_only,
+            # overweight, aligned. Within each band, biggest |delta| first.
+            {"underweight": 0, "position_only": 2, "overweight": 1, "aligned": 3}[
+                s["signal"]
+            ],
+            -abs(s["suggested_delta_eur"]),
+        )
+    )
+
+    totals = {
+        "total_spend_eur": round(
+            sum(s["spend_eur"] for s in suggestions), 2
+        ),
+        "total_invested_eur": round(
+            sum(s["invested_eur"] for s in suggestions), 2
+        ),
+        "underweight_count": sum(1 for s in suggestions if s["signal"] == "underweight"),
+        "underweight_total_delta": round(
+            sum(s["suggested_delta_eur"] for s in suggestions if s["signal"] == "underweight"),
+            2,
+        ),
+    }
+    return {"suggestions": suggestions, "summary": totals}
+
+
 @app.get("/me/spending")
 def me_spending(user: User = Depends(require_user)) -> dict:
     """Aggregated spend insights — monthly totals, category breakdown,

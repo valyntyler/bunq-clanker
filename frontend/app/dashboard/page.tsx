@@ -8,6 +8,7 @@ import { SourceMedia, UserSourcePreview } from "@/components/SourcePreview";
 import { SpendingSection } from "@/components/SpendingSection";
 import { BunqAccountsSection } from "@/components/BunqAccountsSection";
 import { NewsroomTicker } from "@/components/NewsroomTicker";
+import { RebalanceSection } from "@/components/RebalanceSection";
 import {
   meAnalyses,
   meEvidence,
@@ -131,6 +132,8 @@ function Dashboard() {
 
       {/* ── live Bunq accounts + activity (sandbox) ──────── */}
       <NewsroomTicker />
+
+      <RebalanceSection />
 
       <BunqAccountsSection />
 

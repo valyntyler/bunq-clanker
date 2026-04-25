@@ -539,6 +539,45 @@ export async function meSpending(): Promise<SpendingInsights> {
   return j<SpendingInsights>(await authFetch(`${BACKEND_URL}/me/spending`));
 }
 
+export type RebalanceSignal =
+  | "underweight"
+  | "aligned"
+  | "overweight"
+  | "position_only";
+
+export interface RebalanceSuggestion {
+  ticker: string;
+  company_name: string;
+  spend_eur: number;
+  visit_count: number;
+  category: string;
+  invested_eur: number;
+  /** invested_eur / spend_eur — null when spend is 0. */
+  ratio: number | null;
+  signal: RebalanceSignal;
+  /** Positive = consider buying; negative = consider trimming. */
+  suggested_delta_eur: number;
+  rationale: string;
+  verdict: "BUY" | "HOLD" | "AVOID" | null;
+  verdict_confidence: number | null;
+}
+
+export interface RebalanceResponse {
+  suggestions: RebalanceSuggestion[];
+  summary: {
+    total_spend_eur: number;
+    total_invested_eur: number;
+    underweight_count: number;
+    underweight_total_delta: number;
+  };
+}
+
+export async function meRebalance(): Promise<RebalanceResponse> {
+  return j<RebalanceResponse>(
+    await authFetch(`${BACKEND_URL}/me/rebalance`)
+  );
+}
+
 export interface OhlcvBar {
   date: string;
   open: number;
