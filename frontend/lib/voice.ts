@@ -331,6 +331,14 @@ class TtsPlayer {
   private current: HTMLAudioElement | null = null;
   private fetching: AbortController[] = [];
   private cancelled = false;
+  // Tracks whether the pump loop itself is alive, including during the
+  // awaited fetch where `current` is null. Prevents a second enqueue()
+  // during the await from spawning a parallel pump.
+  private pumping = false;
+  // Epoch counter — bumped on every cancel(). Each pump captures the
+  // epoch at start and aborts if it changes mid-loop, so a stale pump
+  // can't win a race against a fresh one started by a new enqueue.
+  private epoch = 0;
 
   /** Enqueue a sentence to be synthesised + spoken. Returns immediately;
    *  the actual fetch + play happens in the background. */
@@ -348,6 +356,9 @@ class TtsPlayer {
   /** Cancel everything: in-flight fetches, queued audio, currently playing. */
   cancel() {
     this.cancelled = true;
+    this.pumping = false; // any in-flight pump will exit on next iteration
+    this.epoch += 1;       // any stale pump that survives the cancelled-check
+                           // must also fail the epoch-check below
     for (const ac of this.fetching) {
       try {
         ac.abort();
@@ -417,35 +428,45 @@ class TtsPlayer {
   }
 
   private async pump() {
-    if (this.current) return; // already playing — pump will resume after
-    while (this.queue.length > 0) {
-      if (this.cancelled) return;
-      const next = this.queue.shift();
-      if (!next) continue;
-      const audio = await next;
-      if (this.cancelled) return;
-      if (!audio) continue;
-      this.current = audio;
-      try {
-        await new Promise<void>((resolve) => {
-          const cleanup = () => {
-            audio.removeEventListener("ended", cleanup);
-            audio.removeEventListener("error", cleanup);
-            resolve();
-          };
-          audio.addEventListener("ended", cleanup);
-          audio.addEventListener("error", cleanup);
-          audio.play().catch(() => cleanup());
-        });
-      } finally {
-        this.current = null;
-        // Free the blob URL we created.
+    // Only one pump loop alive at a time. Without this guard a second
+    // enqueue() during the awaited fetchTts() below would spawn a
+    // parallel pump and we'd hear two voices at once.
+    if (this.pumping) return;
+    this.pumping = true;
+    const myEpoch = this.epoch;
+    const stale = () => this.cancelled || this.epoch !== myEpoch;
+    try {
+      while (this.queue.length > 0) {
+        if (stale()) return;
+        const next = this.queue.shift();
+        if (!next) continue;
+        const audio = await next;
+        if (stale()) return;
+        if (!audio) continue;
+        this.current = audio;
         try {
-          if (audio.src.startsWith("blob:")) URL.revokeObjectURL(audio.src);
-        } catch {
-          // ignore
+          await new Promise<void>((resolve) => {
+            const cleanup = () => {
+              audio.removeEventListener("ended", cleanup);
+              audio.removeEventListener("error", cleanup);
+              resolve();
+            };
+            audio.addEventListener("ended", cleanup);
+            audio.addEventListener("error", cleanup);
+            audio.play().catch(() => cleanup());
+          });
+        } finally {
+          this.current = null;
+          // Free the blob URL we created.
+          try {
+            if (audio.src.startsWith("blob:")) URL.revokeObjectURL(audio.src);
+          } catch {
+            // ignore
+          }
         }
       }
+    } finally {
+      this.pumping = false;
     }
   }
 }

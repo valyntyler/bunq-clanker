@@ -101,6 +101,15 @@ async def _startup() -> None:
     except Exception:  # noqa: BLE001
         log.exception("newsroom: failed to start poller (non-fatal)")
 
+    # Pre-load the local Whisper model so the first /voice/transcribe
+    # request doesn't eat the ~3-5s cold-start. Runs in a thread so the
+    # event loop stays responsive while CTranslate2 does its thing.
+    try:
+        from backend.services.whisper import warmup
+        await asyncio.to_thread(warmup)
+    except Exception:  # noqa: BLE001
+        log.exception("whisper: warmup failed (will lazy-load on first call)")
+
 
 def _migrate_investment_columns() -> None:
     """SQLite ALTER TABLE shim — adds new columns that SQLModel.metadata.create_all
@@ -769,14 +778,12 @@ async def voice_transcribe(
 ) -> dict:
     """One-shot transcription of a short browser-recorded audio clip.
 
-    The frontend records via MediaRecorder with noiseSuppression /
-    echoCancellation / autoGainControl flags set on getUserMedia, plus a
-    Web Audio API highpass + compressor pre-stage. The resulting blob is
-    POSTed here. We hand it to AWS Transcribe (single batch job, polled)
-    and return the transcript text.
+    Default path: local faster-whisper (base.en model, ~300ms for a 5s
+    clip on CPU, no S3 round-trip, no API cost). Falls back to AWS
+    Transcribe batch if Whisper isn't available (model not installed,
+    file format not handled, etc.).
 
-    Accepts: image/* — sorry, audio/* (webm, ogg, m4a, mp3, wav, flac).
-    Caps at 6MB to keep the demo fast.
+    Accepts audio/* (webm, ogg, m4a, mp3, wav). Caps at 6MB.
     """
     if not (file.content_type or "").startswith("audio/"):
         raise HTTPException(400, f"audio/* required (got {file.content_type})")
@@ -786,47 +793,59 @@ async def voice_transcribe(
     if len(raw) > 6 * 1024 * 1024:
         raise HTTPException(413, "audio clip too large (max 6MB / ~60s)")
 
-    # Map browser MIME → AWS Transcribe MediaFormat.
+    # Map browser MIME → file extension. Whisper handles all of these via
+    # PyAV; AWS Transcribe needs the explicit MediaFormat tag.
     ctype = (file.content_type or "").lower()
-    fmt: str
     if "webm" in ctype:
-        fmt = "webm"
+        ext, aws_fmt = "webm", "webm"
     elif "ogg" in ctype:
-        fmt = "ogg"
+        ext, aws_fmt = "ogg", "ogg"
     elif "mp4" in ctype or "m4a" in ctype:
-        fmt = "mp4"
+        ext, aws_fmt = "m4a", "mp4"
     elif "mpeg" in ctype or "mp3" in ctype:
-        fmt = "mp3"
+        ext, aws_fmt = "mp3", "mp3"
     elif "wav" in ctype:
-        fmt = "wav"
+        ext, aws_fmt = "wav", "wav"
     else:
-        fmt = "webm"
+        ext, aws_fmt = "webm", "webm"
 
+    provider = (os.getenv("VOICE_TRANSCRIBE_PROVIDER") or "whisper").lower()
+
+    # ---- Primary path: local Whisper -------------------------------
+    if provider != "aws":
+        try:
+            from backend.services.whisper import transcribe_bytes
+            text = await asyncio.to_thread(transcribe_bytes, raw, ext)
+            return {
+                "transcript": text,
+                "format": ext,
+                "bytes": len(raw),
+                "engine": "whisper",
+            }
+        except ImportError as e:
+            log.warning("whisper unavailable, falling back to AWS: %s", e)
+        except Exception as e:  # noqa: BLE001
+            log.warning("whisper transcribe failed, falling back to AWS: %s", e)
+
+    # ---- Fallback path: AWS Transcribe ------------------------------
     from backend.aws import put_bytes
-    from backend.scrapers.geopolitical_clips import transcribe_via_aws
 
-    suffix = {"webm": "webm", "ogg": "ogg", "mp4": "m4a", "mp3": "mp3", "wav": "wav"}.get(fmt, "webm")
-    key = f"voice/{datetime.now(timezone.utc).strftime('%Y%m%d')}/{os.urandom(6).hex()}.{suffix}"
+    key = f"voice/{datetime.now(timezone.utc).strftime('%Y%m%d')}/{os.urandom(6).hex()}.{ext}"
     s3_uri = await asyncio.to_thread(
         put_bytes, key, raw, content_type=file.content_type or "audio/webm"
     )
-
     try:
-        # transcribe_via_aws() defaults to wav; we patch the format inline.
-        # The function is short enough that we do the call directly here.
-        import boto3, time as _time, uuid as _uuid, httpx as _httpx
+        import time as _time, uuid as _uuid, httpx as _httpx
         from backend.aws import REGION
         client = boto3.client("transcribe", region_name=REGION)
         job_name = f"sauron-voice-{_uuid.uuid4().hex[:10]}"
         client.start_transcription_job(
             TranscriptionJobName=job_name,
             Media={"MediaFileUri": s3_uri},
-            MediaFormat=fmt,
+            MediaFormat=aws_fmt,
             LanguageCode="en-US",
         )
-        # Tight polling — voice clips are short so jobs land fast (~2-4s).
-        # Use a 0.5s cadence so we don't sit waiting for the next slot.
-        for _ in range(60):  # 60 * 0.5 = 30s budget
+        for _ in range(60):
             await asyncio.sleep(0.5)
             j = client.get_transcription_job(TranscriptionJobName=job_name)
             status = j["TranscriptionJob"]["TranscriptionJobStatus"]
@@ -840,9 +859,9 @@ async def voice_transcribe(
                 ).strip()
                 return {
                     "transcript": text,
-                    "duration_s": None,
-                    "format": fmt,
+                    "format": ext,
                     "bytes": len(raw),
+                    "engine": "aws-transcribe",
                 }
             if status == "FAILED":
                 raise RuntimeError(
@@ -852,7 +871,7 @@ async def voice_transcribe(
     except HTTPException:
         raise
     except Exception as e:  # noqa: BLE001
-        log.exception("voice transcribe failed")
+        log.exception("voice transcribe failed (both engines)")
         raise HTTPException(503, f"transcribe failed: {e}")
 
 

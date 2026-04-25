@@ -36,3 +36,4 @@ pymupdf==1.25.1
 # brokerage / banking
 alpaca-py==0.36.0
 bunq_sdk==1.23.0
+faster-whisper
