@@ -54,7 +54,7 @@ export function TopBar() {
         />
         <span
           className="ml-3 hidden items-center gap-2 font-mono text-[11px] text-[var(--bunq-muted)] sm:inline-flex"
-          title={user.email}
+          title={`${user.email}${user.bunq_connected ? " · Bunq connected" : ""}`}
         >
           <span
             className="inline-flex h-5 w-5 items-center justify-center rounded-full text-[9px] font-bold"
@@ -66,7 +66,20 @@ export function TopBar() {
           >
             {initial}
           </span>
-          <span className="text-[var(--bunq-text)]">{user.email}</span>
+          <span className="text-[var(--bunq-text)]">{user.display_name || user.email}</span>
+          {user.bunq_connected && (
+            <span
+              className="rounded-full px-1.5 py-0 font-mono text-[8px] uppercase tracking-[0.16em]"
+              style={{
+                background: "var(--bunq-green-soft)",
+                color: "var(--bunq-green)",
+                border: "1px solid rgba(181,255,0,0.30)",
+              }}
+              title="Connected to your own Bunq sandbox account"
+            >
+              bunq
+            </span>
+          )}
         </span>
         <button
           onClick={() => {

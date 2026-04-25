@@ -20,10 +20,23 @@ import requests
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import padding, rsa
 
+import hashlib
+
 SANDBOX_BASE_URL = "https://public-api.sandbox.bunq.com"
 PRODUCTION_BASE_URL = "https://api.bunq.com"
 API_VERSION = "v1"
-CONTEXT_FILE = "bunq_context.json"
+CONTEXT_FILE = "bunq_context.json"  # legacy single-file path (env-fallback user)
+CONTEXT_DIR = "bunq_contexts"        # per-API-key context jars
+
+
+def _context_path_for(api_key: str) -> str:
+    """One context file per API key, hashed so the filename never leaks the
+    raw key. Falls back to the legacy single-file path when the dir doesn't
+    exist (so the env-fallback demo path keeps working unchanged)."""
+    if not api_key:
+        return CONTEXT_FILE
+    digest = hashlib.sha256(api_key.encode()).hexdigest()[:16]
+    return os.path.join(CONTEXT_DIR, f"{digest}.json")
 
 
 class BunqClient:
@@ -209,6 +222,13 @@ class BunqClient:
     # Context save / load
     # ------------------------------------------------------------------
 
+    def _context_paths(self) -> list[str]:
+        """Candidate paths to load context from, in priority order. We try
+        the per-API-key path first; if that's missing we also check the
+        legacy single-file path so the env-fallback demo user keeps working
+        without re-authentication after this refactor."""
+        return [_context_path_for(self.api_key), CONTEXT_FILE]
+
     def _save_context(self) -> None:
         context = {
             "api_key": self.api_key,
@@ -223,29 +243,33 @@ class BunqClient:
             "session_token": self.session_token,
             "user_id": self.user_id,
         }
-        with open(CONTEXT_FILE, "w") as f:
+        path = _context_path_for(self.api_key)
+        os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+        with open(path, "w") as f:
             json.dump(context, f, indent=2)
 
     def _load_context(self) -> bool:
-        if not os.path.exists(CONTEXT_FILE):
-            return False
-        try:
-            with open(CONTEXT_FILE) as f:
-                ctx = json.load(f)
-            if ctx.get("api_key") != self.api_key or ctx.get("sandbox") != self.sandbox:
-                return False
-            self._private_key = serialization.load_pem_private_key(
-                ctx["private_key_pem"].encode(),
-                password=None,
-            )
-            self._public_key_pem = self._private_key.public_key().public_bytes(
-                serialization.Encoding.PEM,
-                serialization.PublicFormat.SubjectPublicKeyInfo,
-            ).decode()
-            self.installation_token = ctx["installation_token"]
-            self.server_public_key = ctx["server_public_key"]
-            self.session_token = ctx["session_token"]
-            self.user_id = ctx["user_id"]
-            return True
-        except (json.JSONDecodeError, KeyError, ValueError):
-            return False
+        for path in self._context_paths():
+            if not os.path.exists(path):
+                continue
+            try:
+                with open(path) as f:
+                    ctx = json.load(f)
+                if ctx.get("api_key") != self.api_key or ctx.get("sandbox") != self.sandbox:
+                    continue
+                self._private_key = serialization.load_pem_private_key(
+                    ctx["private_key_pem"].encode(),
+                    password=None,
+                )
+                self._public_key_pem = self._private_key.public_key().public_bytes(
+                    serialization.Encoding.PEM,
+                    serialization.PublicFormat.SubjectPublicKeyInfo,
+                ).decode()
+                self.installation_token = ctx["installation_token"]
+                self.server_public_key = ctx["server_public_key"]
+                self.session_token = ctx["session_token"]
+                self.user_id = ctx["user_id"]
+                return True
+            except (json.JSONDecodeError, KeyError, ValueError):
+                continue
+        return False

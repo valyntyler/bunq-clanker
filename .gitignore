@@ -4,6 +4,7 @@
 !.env.example
 bunq.conf
 bunq_context.json
+bunq_contexts/
 *.pem
 *.key
 .aws/

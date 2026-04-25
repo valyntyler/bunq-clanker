@@ -27,7 +27,19 @@ engine = create_engine(
 class User(SQLModel, table=True):
     id: str = Field(default_factory=lambda: uuid.uuid4().hex, primary_key=True)
     email: str = Field(index=True, unique=True)
-    password_hash: str
+    # Empty when the user signed up via OAuth (Google / Apple / Bunq) and
+    # has no password — auth is then keyed off the provider claim.
+    password_hash: str = ""
+    # Provider tag: "" = email, "google" / "apple" / "bunq" otherwise.
+    auth_provider: str = ""
+    display_name: str = ""
+    # Per-user Bunq sandbox creds. Set when the user signed up via Bunq OR
+    # connected their account later. When empty, /balance and the /me/bunq
+    # endpoints fall back to the global env-var creds (legacy/demo path).
+    bunq_api_key: str | None = None
+    bunq_user_id: int | None = None
+    bunq_main_account_id: int | None = None
+    bunq_pot_account_id: int | None = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 

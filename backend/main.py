@@ -95,16 +95,27 @@ def _startup() -> None:
 def _migrate_investment_columns() -> None:
     """SQLite ALTER TABLE shim — adds new columns that SQLModel.metadata.create_all
     won't add to an existing table. Idempotent."""
-    from sqlalchemy import text
-    additions = [
+    investment_additions = [
         ("bunq_pot_id", "INTEGER"),
         ("bunq_pot_name", "VARCHAR"),
     ]
+    user_additions = [
+        ("auth_provider", "VARCHAR DEFAULT ''"),
+        ("display_name", "VARCHAR DEFAULT ''"),
+        ("bunq_api_key", "VARCHAR"),
+        ("bunq_user_id", "INTEGER"),
+        ("bunq_main_account_id", "INTEGER"),
+        ("bunq_pot_account_id", "INTEGER"),
+    ]
     with engine.begin() as conn:
         existing = {row[1] for row in conn.exec_driver_sql("PRAGMA table_info(investment)").fetchall()}
-        for col, sql_type in additions:
+        for col, sql_type in investment_additions:
             if col not in existing:
                 conn.exec_driver_sql(f"ALTER TABLE investment ADD COLUMN {col} {sql_type}")
+        existing_user = {row[1] for row in conn.exec_driver_sql("PRAGMA table_info(user)").fetchall()}
+        for col, sql_type in user_additions:
+            if col not in existing_user:
+                conn.exec_driver_sql(f"ALTER TABLE user ADD COLUMN {col} {sql_type}")
 
 # frontend is served from a different port in dev — allow localhost origins
 app.add_middleware(
@@ -149,6 +160,18 @@ EMAIL_RE = __import__("re").compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 _VALID_PERIODS = {"1d", "5d", "1mo", "3mo", "6mo", "1y", "2y", "5y", "10y", "max"}
 
 
+def _user_dict(u: User) -> dict:
+    """The shape our frontend expects on every auth response."""
+    return {
+        "id": u.id,
+        "email": u.email,
+        "created_at": u.created_at.isoformat(),
+        "auth_provider": u.auth_provider or "email",
+        "display_name": u.display_name or "",
+        "bunq_connected": bool(u.bunq_api_key),
+    }
+
+
 @app.post("/auth/register", response_model=AuthResponse)
 def auth_register(req: RegisterRequest, session: Session = Depends(get_session)) -> AuthResponse:
     email = req.email.strip().lower()
@@ -159,38 +182,159 @@ def auth_register(req: RegisterRequest, session: Session = Depends(get_session))
     existing = session.exec(select(User).where(User.email == email)).first()
     if existing:
         raise HTTPException(409, "an account with that email already exists")
-    user = User(email=email, password_hash=hash_password(req.password))
+    user = User(
+        email=email,
+        password_hash=hash_password(req.password),
+        auth_provider="email",
+    )
     session.add(user)
     session.commit()
     session.refresh(user)
     token = create_token(user.id)
-    return AuthResponse(
-        token=token,
-        user={"id": user.id, "email": user.email, "created_at": user.created_at.isoformat()},
-    )
+    return AuthResponse(token=token, user=_user_dict(user))
 
 
 @app.post("/auth/login", response_model=AuthResponse)
 def auth_login(req: LoginRequest, session: Session = Depends(get_session)) -> AuthResponse:
     email = req.email.strip().lower()
     user = session.exec(select(User).where(User.email == email)).first()
-    if user is None or not verify_password(req.password, user.password_hash):
-        # Keep the message generic — don't leak which side was wrong
+    if user is None or not user.password_hash or not verify_password(req.password, user.password_hash):
+        # Keep the message generic — don't leak which side was wrong, and
+        # don't tell users created via OAuth that they have no password.
         raise HTTPException(401, "invalid credentials")
     token = create_token(user.id)
-    return AuthResponse(
-        token=token,
-        user={"id": user.id, "email": user.email, "created_at": user.created_at.isoformat()},
+    return AuthResponse(token=token, user=_user_dict(user))
+
+
+@app.post("/auth/oauth", response_model=AuthResponse)
+def auth_oauth(payload: dict, session: Session = Depends(get_session)) -> AuthResponse:
+    """OAuth-style sign-in for Google / Apple-iCloud / generic providers.
+
+    Hackathon-grade: in production we'd verify a real OIDC id_token from the
+    provider; here we accept the email + display_name + provider tag the
+    frontend collects. Re-using the same email auto-logs an existing user in.
+
+    Body: { provider: 'google'|'apple'|str, email: str, display_name?: str }
+    """
+    provider = (payload.get("provider") or "").strip().lower()[:32] or "oauth"
+    email = (payload.get("email") or "").strip().lower()
+    display_name = (payload.get("display_name") or "").strip()[:80]
+    if not EMAIL_RE.match(email):
+        raise HTTPException(400, "invalid email")
+    user = session.exec(select(User).where(User.email == email)).first()
+    if user is None:
+        user = User(
+            email=email,
+            password_hash="",
+            auth_provider=provider,
+            display_name=display_name,
+        )
+        session.add(user)
+        session.commit()
+        session.refresh(user)
+    else:
+        # First sign-in via this provider for an email that previously
+        # registered another way: don't overwrite their password, just stamp
+        # the most recent provider so the UI shows the right pill.
+        if display_name and not user.display_name:
+            user.display_name = display_name
+        if not user.auth_provider:
+            user.auth_provider = provider
+        session.add(user)
+        session.commit()
+    token = create_token(user.id)
+    return AuthResponse(token=token, user=_user_dict(user))
+
+
+@app.post("/auth/register/bunq", response_model=AuthResponse)
+def auth_register_bunq(payload: dict, session: Session = Depends(get_session)) -> AuthResponse:
+    """Mint a fresh Bunq sandbox user, bootstrap a Main + Investment Pot,
+    and create a Sauron account with those creds attached.
+
+    Body: { email?: str, display_name?: str }
+    The email is optional — if omitted, we synthesise one from the Bunq
+    sandbox display name so the user can still log in via /auth/login or
+    /auth/oauth later. The Bunq display name typically becomes the user's
+    visible identity (it's what Bunq shows as the 'C. Sullivan'-style
+    persona).
+    """
+    requested_email = (payload.get("email") or "").strip().lower()
+    requested_name = (payload.get("display_name") or "").strip()[:80]
+
+    try:
+        creds = bunq_i.provision_new_sandbox_user()
+    except Exception as e:  # noqa: BLE001
+        log.exception("bunq sandbox provisioning failed")
+        raise HTTPException(503, f"could not mint Bunq sandbox account: {e}")
+
+    display_name = requested_name or creds["display_name"] or "Bunq user"
+    if requested_email:
+        if not EMAIL_RE.match(requested_email):
+            raise HTTPException(400, "invalid email")
+        email = requested_email
+    else:
+        # Synthesise a stable, unique email so the User row's unique
+        # constraint holds even when no email was provided.
+        slug = "".join(ch.lower() for ch in display_name if ch.isalnum()) or "bunq"
+        email = f"{slug}+{creds['user_id']}@bunq.sandbox.local"
+    if session.exec(select(User).where(User.email == email)).first():
+        raise HTTPException(409, "an account with that email already exists")
+
+    user = User(
+        email=email,
+        password_hash="",
+        auth_provider="bunq",
+        display_name=display_name,
+        bunq_api_key=creds["api_key"],
+        bunq_user_id=creds["user_id"],
+        bunq_main_account_id=creds["main_account_id"],
+        bunq_pot_account_id=creds["pot_account_id"],
     )
+    session.add(user)
+    session.commit()
+    session.refresh(user)
+    token = create_token(user.id)
+    return AuthResponse(token=token, user=_user_dict(user))
+
+
+@app.post("/me/bunq/connect", response_model=AuthResponse)
+def me_bunq_connect(
+    payload: dict,
+    user: User = Depends(require_user),
+    session: Session = Depends(get_session),
+) -> AuthResponse:
+    """Attach an existing Bunq sandbox API key to the current Sauron user.
+
+    Used by email / Google / Apple users who want their /balance and
+    /invest flows to hit their own sandbox account instead of the
+    shared env-fallback one.
+
+    Body: { api_key: str }
+    """
+    api_key = (payload.get("api_key") or "").strip()
+    if not api_key:
+        raise HTTPException(400, "api_key required")
+    try:
+        creds = bunq_i.attach_existing_api_key(api_key)
+    except Exception as e:  # noqa: BLE001
+        log.exception("bunq attach failed")
+        raise HTTPException(400, f"could not authenticate with that API key: {e}")
+    user.bunq_api_key = creds["api_key"]
+    user.bunq_user_id = creds["user_id"]
+    user.bunq_main_account_id = creds["main_account_id"]
+    user.bunq_pot_account_id = creds["pot_account_id"]
+    if not user.display_name and creds.get("display_name"):
+        user.display_name = creds["display_name"]
+    session.add(user)
+    session.commit()
+    session.refresh(user)
+    token = create_token(user.id)
+    return AuthResponse(token=token, user=_user_dict(user))
 
 
 @app.get("/auth/me")
 def auth_me(user: User = Depends(require_user)) -> dict:
-    return {
-        "id": user.id,
-        "email": user.email,
-        "created_at": user.created_at.isoformat(),
-    }
+    return _user_dict(user)
 
 
 # ---- per-user dashboard --------------------------------------------------
@@ -536,7 +680,7 @@ def me_bunq_profile(user: User = Depends(require_user)) -> dict:
     """Live Bunq user record — display name, country, language, avatar.
     Powers the TopBar greeting + the dashboard 'Bunq Accounts' header."""
     try:
-        return bunq_i.get_user_profile()
+        return bunq_i.get_user_profile(user=user)
     except Exception as e:  # noqa: BLE001
         log.exception("bunq profile failed")
         raise HTTPException(503, f"bunq unavailable: {e}")
@@ -547,7 +691,7 @@ def me_bunq_accounts(user: User = Depends(require_user)) -> dict:
     """Every Bunq monetary account the user owns — main + every pot,
     including the per-ticker 'Sauron · TICKER' pots created by /invest."""
     try:
-        accounts = bunq_i.list_monetary_accounts()
+        accounts = bunq_i.list_monetary_accounts(user=user)
         return {
             "accounts": accounts,
             "summary": {
@@ -570,7 +714,7 @@ def me_bunq_activity(
     """Recent Bunq payments — across all accounts when account_id is omitted,
     otherwise scoped to a single pot. Shows up in the dashboard activity feed."""
     try:
-        return {"payments": bunq_i.list_payments(account_id=account_id, count=min(count, 100))}
+        return {"payments": bunq_i.list_payments(account_id=account_id, count=min(count, 100), user=user)}
     except Exception as e:  # noqa: BLE001
         log.exception("bunq activity failed")
         raise HTTPException(503, f"bunq unavailable: {e}")
@@ -788,7 +932,7 @@ async def receipts_split_request(
         description = f"{name}'s share of {merchant} · sauron split"
         try:
             rid = await asyncio.to_thread(
-                bunq_i.request_payment_from_email, email, amount, description
+                bunq_i.request_payment_from_email, email, amount, description, user
             )
             results.append({
                 "name": name, "email": email,
@@ -1599,7 +1743,7 @@ async def panel_data(
     matched_count = 0
     if aliases:
         try:
-            agg = await asyncio.to_thread(bunq_i.aggregate_panel, aliases, 24)
+            agg = await asyncio.to_thread(bunq_i.aggregate_panel, aliases, 24, 200, user)
             if agg["matched_count"] >= LIVE_MIN_MATCHES:
                 live_months = agg["months"]
                 live_n = agg["panel_size_n"]
@@ -1665,9 +1809,10 @@ FX_EUR_USD = 1.08  # stub rate — we don't need a live FX feed for a paper-trad
 
 @app.get("/balance")
 def balance(user: User = Depends(require_user)) -> dict:
-    """Live Bunq sandbox balances (main + pot). Powers the Invest modal."""
+    """Live Bunq sandbox balances (main + pot). Powers the Invest modal.
+    Reads from the user's own Bunq creds when connected, env-fallback otherwise."""
     try:
-        return bunq_i.get_balance()
+        return bunq_i.get_balance(user=user)
     except Exception as e:  # noqa: BLE001
         log.exception("bunq balance failed")
         raise HTTPException(503, f"bunq unavailable: {e}")
@@ -1692,19 +1837,21 @@ def invest(
     ticker_up = req.ticker.upper()
     pot_name = f"Sauron · {ticker_up}"
     try:
-        bal = bunq_i.get_balance()
+        bal = bunq_i.get_balance(user=user)
         if bal["main"] < req.amount_eur:
             needed = req.amount_eur - bal["main"]
             bunq_i.fund_main_from_sugardaddy(
                 max(needed, 50.0),
                 description=f"sauron top-up for {ticker_up}",
+                user=user,
             )
-        ticker_pot_id = bunq_i.ensure_ticker_pot(ticker_up)
+        ticker_pot_id = bunq_i.ensure_ticker_pot(ticker_up, user=user)
         bunq_payment_id = bunq_i.transfer_main_to_account(
             ticker_pot_id,
             req.amount_eur,
             description=f"sauron: {ticker_up} position",
             name=pot_name,
+            user=user,
         )
     except Exception as e:  # noqa: BLE001
         log.exception("bunq transfer failed")
