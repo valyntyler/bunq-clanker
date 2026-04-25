@@ -9,7 +9,7 @@ import {
   isVoiceInputSupported,
   speakText,
   stopSpeaking,
-  useSpeechRecognition,
+  useMicRecorder,
   warmVoices,
 } from "@/lib/voice";
 
@@ -46,22 +46,15 @@ export function ChatPanel({ report }: { report: Report }) {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [history, streamingText]);
 
-  const sr = useSpeechRecognition({
+  const mic = useMicRecorder({
+    maxDurationMs: 50_000, // backend caps at 60s; finish a tick early
     onFinal: (text) => {
-      // Auto-send the final transcript when the user releases the mic.
       void send(text);
     },
-    onInterim: (text) => {
-      setInput(text);
-    },
     onError: (msg) => {
-      // 'no-speech' / 'aborted' / 'not-allowed' come through here. Soften
-      // the user-facing copy — these are normal everyday cases.
       const friendly: Record<string, string> = {
-        "not-allowed": "microphone permission denied",
-        "no-speech": "didn't catch any speech, try again",
-        aborted: "",
-        network: "voice input is offline",
+        "Permission denied": "microphone permission denied",
+        "didn't catch any speech, try again": "didn't catch any speech, try again",
       };
       const m = friendly[msg] ?? msg;
       if (m) setVoiceError(m);
@@ -241,13 +234,15 @@ export function ChatPanel({ report }: { report: Report }) {
       >
         {voiceInputAvail.current && (
           <MicButton
-            active={sr.active}
+            active={mic.active}
+            level={mic.level}
+            transcribing={mic.transcribing}
             disabled={streaming}
             onStart={() => {
               setVoiceError(null);
-              sr.start();
+              void mic.start();
             }}
-            onStop={() => sr.stop()}
+            onStop={() => mic.stop()}
           />
         )}
         <div className="flex flex-1 flex-col gap-1">
@@ -257,11 +252,13 @@ export function ChatPanel({ report }: { report: Report }) {
             placeholder={
               streaming
                 ? "Streaming reply…"
-                : sr.active
-                  ? "Listening…"
-                  : "Ask anything about the analysis"
+                : mic.transcribing
+                  ? "Transcribing — Claude can hear you over background noise…"
+                  : mic.active
+                    ? "Listening — tap the mic again when you're done"
+                    : "Ask anything about the analysis"
             }
-            disabled={streaming || sr.active}
+            disabled={streaming || mic.active || mic.transcribing}
             className="rounded-full px-4 py-2 text-sm outline-none disabled:opacity-50"
             style={{
               background: "var(--bunq-surface-2)",
@@ -277,7 +274,7 @@ export function ChatPanel({ report }: { report: Report }) {
         </div>
         <button
           type="submit"
-          disabled={streaming || !input.trim() || sr.active}
+          disabled={streaming || !input.trim() || mic.active || mic.transcribing}
           className="bunq-glow rounded-full px-5 text-sm font-semibold disabled:opacity-50"
           style={{ background: "var(--bunq-green)", color: "#0a0d05" }}
         >
@@ -288,23 +285,26 @@ export function ChatPanel({ report }: { report: Report }) {
   );
 }
 
-/** Hold-to-talk mic. Press-and-hold (or click-to-toggle on touch
- *  devices that don't reliably fire pointerup). */
+/** Mic button with three states: idle (🎤), recording (live level ring),
+ *  and transcribing (spinner). Tap-to-toggle so users can pause between
+ *  sentences without losing the session. */
 function MicButton({
   active,
+  level,
+  transcribing,
   disabled,
   onStart,
   onStop,
 }: {
   active: boolean;
+  level: number;
+  transcribing: boolean;
   disabled: boolean;
   onStart: () => void;
   onStop: () => void;
 }) {
-  // Some touch devices steal pointer events during long-press, so we also
-  // accept a single click as a toggle: click to start, click again to stop.
   function handlePointerDown(e: React.PointerEvent<HTMLButtonElement>) {
-    if (disabled) return;
+    if (disabled || transcribing) return;
     e.preventDefault();
     if (active) {
       onStop();
@@ -312,39 +312,49 @@ function MicButton({
       onStart();
     }
   }
-
-  function handlePointerUp() {
-    // No-op: with the pointer-down toggle pattern, release doesn't stop
-    // recording (so users can lift fingers between sentences). Stop is
-    // either another click or the recogniser's own end-of-speech detect.
-  }
+  // Bigger glow when the user is louder so it visibly responds to voice.
+  const glow = active
+    ? `0 0 0 ${4 + level * 18}px rgba(255,91,107,${0.10 + level * 0.18}), 0 6px 18px -6px rgba(255,91,107,0.45)`
+    : undefined;
 
   return (
     <button
       type="button"
       onPointerDown={handlePointerDown}
-      onPointerUp={handlePointerUp}
-      disabled={disabled}
-      title={active ? "Tap to stop" : "Tap to talk"}
+      disabled={disabled || transcribing}
+      title={
+        transcribing
+          ? "Transcribing your audio…"
+          : active
+            ? "Tap to stop"
+            : "Tap to talk"
+      }
       aria-pressed={active}
       className="rounded-full px-3.5 text-base font-semibold transition disabled:opacity-50"
       style={
-        active
+        transcribing
           ? {
-              background: "var(--bunq-bad-soft)",
-              color: "var(--bunq-bad)",
-              border: "1px solid rgba(255,91,107,0.40)",
-              boxShadow:
-                "0 0 0 4px rgba(255,91,107,0.15), 0 6px 18px -6px rgba(255,91,107,0.45)",
+              background: "var(--bunq-green-soft)",
+              color: "var(--bunq-green)",
+              border: "1px solid rgba(181,255,0,0.30)",
             }
-          : {
-              background: "var(--bunq-surface-2)",
-              color: "var(--bunq-text)",
-              border: "1px solid var(--bunq-border-strong)",
-            }
+          : active
+            ? {
+                background: "var(--bunq-bad-soft)",
+                color: "var(--bunq-bad)",
+                border: "1px solid rgba(255,91,107,0.40)",
+                boxShadow: glow,
+              }
+            : {
+                background: "var(--bunq-surface-2)",
+                color: "var(--bunq-text)",
+                border: "1px solid var(--bunq-border-strong)",
+              }
       }
     >
-      <span className={active ? "animate-pulse" : ""}>{active ? "●" : "🎤"}</span>
+      <span className={transcribing ? "animate-spin" : active ? "animate-pulse" : ""}>
+        {transcribing ? "⟳" : active ? "●" : "🎤"}
+      </span>
     </button>
   );
 }

@@ -1,163 +1,308 @@
 "use client";
 
 /**
- * Browser-native voice helpers.
+ * Voice helpers — input via MediaRecorder + getUserMedia (noise-suppressed),
+ * output via browser speechSynthesis.
  *
- * SpeechRecognition (input)  — Chrome/Edge/Safari; live partial transcripts,
- * zero backend round-trip. We expose a hold-to-talk session so the user
- * presses the mic, dictates, and on release we auto-send the final.
+ * Why MediaRecorder over the SpeechRecognition Web API? SpeechRecognition
+ * uses its own raw mic stream and ignores the noiseSuppression /
+ * echoCancellation / autoGainControl flags, so a noisy room kills the
+ * transcript quality. MediaRecorder lets us:
+ *   1. acquire the mic via getUserMedia with explicit cleanup flags
+ *   2. route the stream through Web Audio API for an extra highpass +
+ *      compressor pass that knocks down low-frequency rumble + AC hum
+ *   3. record the *cleaned* output into a webm/opus blob
+ *   4. ship the blob to /voice/transcribe (AWS Transcribe) for the text
  *
- * speechSynthesis (output)   — universal; we pick a clean voice (Google /
- * Apple-Siri / Microsoft Aria) when available and fall back to whatever
- * the browser ships. Streaming TTS would split the assistant reply into
- * sentence chunks so the read-back starts before generation finishes —
- * we keep it simple and speak the full reply once streaming completes.
- *
- * Both APIs are checked at runtime; if neither is available, the UI hides
- * the mic / mute buttons.
+ * Tradeoff: we lose the live partial-transcript UX (transcripts arrive
+ * after the user releases the mic), but transcription quality goes way
+ * up in real-world environments — which is the actual problem in a demo.
  */
 
 import { useEffect, useRef, useState } from "react";
+import { BACKEND_URL } from "./api";
 
-// The W3C SpeechRecognition spec isn't in TS's default dom lib yet, so we
-// declare the minimum surface we touch. Behaves identically across the
-// `webkitSpeechRecognition` (Safari/Chrome) and `SpeechRecognition`
-// (Edge/standards-track) implementations.
-interface SRResult {
-  isFinal: boolean;
-  readonly length: number;
-  readonly [n: number]: { transcript: string };
-}
-interface SRResultList {
-  readonly length: number;
-  readonly [n: number]: SRResult;
-}
-interface SREvent extends Event {
-  resultIndex: number;
-  results: SRResultList;
-}
-interface SRInstance extends EventTarget {
-  lang: string;
-  continuous: boolean;
-  interimResults: boolean;
-  onresult: ((ev: SREvent) => void) | null;
-  onerror: ((ev: Event) => void) | null;
-  onend: (() => void) | null;
-  start(): void;
-  stop(): void;
-  abort(): void;
-}
-type SRCtor = new () => SRInstance;
-
-interface SRWindow extends Window {
-  SpeechRecognition?: SRCtor;
-  webkitSpeechRecognition?: SRCtor;
-}
-
-function getSR(): SRCtor | null {
-  if (typeof window === "undefined") return null;
-  const w = window as SRWindow;
-  return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null;
+const TOKEN_KEY = "sauron.token";
+function authHeader(): Record<string, string> {
+  if (typeof window === "undefined") return {};
+  const t = window.localStorage.getItem(TOKEN_KEY);
+  return t ? { authorization: `Bearer ${t}` } : {};
 }
 
 export function isVoiceInputSupported(): boolean {
-  return getSR() !== null;
+  if (typeof window === "undefined") return false;
+  return !!(
+    navigator.mediaDevices &&
+    typeof navigator.mediaDevices.getUserMedia === "function" &&
+    typeof window.MediaRecorder !== "undefined"
+  );
 }
 
 export function isTtsSupported(): boolean {
   return typeof window !== "undefined" && "speechSynthesis" in window;
 }
 
-/**
- * Hold-to-talk hook. Call start() when the mic button is pressed,
- * stop() on release. interim/final transcript flow through callbacks.
- */
-export function useSpeechRecognition(opts?: {
-  lang?: string;
-  onFinal?: (text: string) => void;
-  onInterim?: (text: string) => void;
-  onError?: (message: string) => void;
-}) {
-  const [active, setActive] = useState(false);
-  const [interim, setInterim] = useState("");
-  const [supported, setSupported] = useState(false);
-  const recRef = useRef<SRInstance | null>(null);
-  const finalAccRef = useRef("");
-
-  useEffect(() => {
-    setSupported(isVoiceInputSupported());
-  }, []);
-
-  function start() {
-    const SR = getSR();
-    if (!SR) {
-      opts?.onError?.("voice input not supported in this browser");
-      return;
-    }
-    if (active) return;
-    finalAccRef.current = "";
-    setInterim("");
-
-    const r = new SR();
-    r.lang = opts?.lang ?? "en-US";
-    r.continuous = true;
-    r.interimResults = true;
-    r.onresult = (ev: SREvent) => {
-      let interimText = "";
-      let finalChunk = "";
-      for (let i = ev.resultIndex; i < ev.results.length; i++) {
-        const res = ev.results[i];
-        if (res.isFinal) finalChunk += res[0].transcript;
-        else interimText += res[0].transcript;
-      }
-      if (finalChunk) {
-        finalAccRef.current += finalChunk;
-        opts?.onInterim?.(finalAccRef.current + interimText);
-      }
-      setInterim(interimText);
-      opts?.onInterim?.(finalAccRef.current + interimText);
-    };
-    r.onerror = (ev: Event) => {
-      const errCode =
-        (ev as unknown as { error?: string }).error ?? "unknown";
-      opts?.onError?.(errCode);
-    };
-    r.onend = () => {
-      setActive(false);
-      setInterim("");
-      const finalText = finalAccRef.current.trim();
-      if (finalText) opts?.onFinal?.(finalText);
-    };
-    recRef.current = r;
-    try {
-      r.start();
-      setActive(true);
-    } catch (e) {
-      opts?.onError?.((e as Error).message);
+// Pick a MediaRecorder mimeType that this browser actually supports. Order
+// matters: Chrome/Firefox prefer webm/opus; Safari only does mp4/m4a.
+function pickRecorderMime(): string | undefined {
+  if (typeof window === "undefined") return undefined;
+  const candidates = [
+    "audio/webm;codecs=opus",
+    "audio/webm",
+    "audio/ogg;codecs=opus",
+    "audio/mp4",
+    "audio/mpeg",
+  ];
+  for (const m of candidates) {
+    if (
+      typeof MediaRecorder.isTypeSupported === "function" &&
+      MediaRecorder.isTypeSupported(m)
+    ) {
+      return m;
     }
   }
+  return undefined;
+}
 
-  function stop() {
-    recRef.current?.stop();
-    // onend handles the final-text dispatch.
-  }
+interface RecorderHandle {
+  active: boolean;
+  level: number; // 0..1, RMS amplitude for the live mic level meter
+  transcribing: boolean;
+  error: string | null;
+  start(): Promise<void>;
+  stop(): void;
+}
 
-  // Best-effort cleanup on unmount.
-  useEffect(() => {
-    return () => {
-      try {
-        recRef.current?.abort();
-      } catch {
-        // ignore
-      }
-    };
-  }, []);
-
-  return { active, interim, supported, start, stop };
+interface UseRecorderOpts {
+  onFinal: (text: string) => void;
+  onError?: (msg: string) => void;
+  /** Hard cap on recording length — the backend caps at 60s anyway. */
+  maxDurationMs?: number;
 }
 
 /**
- * Pick a clean voice if the browser has one. Order of preference:
+ * Hold-to-talk hook driven by MediaRecorder. start() acquires the mic,
+ * stop() ends recording and uploads the blob; on success the transcript
+ * flows through `onFinal`.
+ */
+export function useMicRecorder(opts: UseRecorderOpts): RecorderHandle {
+  const [active, setActive] = useState(false);
+  const [transcribing, setTranscribing] = useState(false);
+  const [level, setLevel] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+  const recRef = useRef<MediaRecorder | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+  const meterRafRef = useRef<number | null>(null);
+  const stopTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function teardown() {
+    if (stopTimerRef.current) {
+      clearTimeout(stopTimerRef.current);
+      stopTimerRef.current = null;
+    }
+    if (meterRafRef.current) {
+      cancelAnimationFrame(meterRafRef.current);
+      meterRafRef.current = null;
+    }
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    streamRef.current = null;
+    if (audioCtxRef.current && audioCtxRef.current.state !== "closed") {
+      audioCtxRef.current.close().catch(() => undefined);
+    }
+    audioCtxRef.current = null;
+    recRef.current = null;
+    setLevel(0);
+  }
+
+  useEffect(() => () => teardown(), []);
+
+  async function start(): Promise<void> {
+    if (active || transcribing) return;
+    setError(null);
+    chunksRef.current = [];
+
+    let stream: MediaStream;
+    try {
+      // Browser-native noise suppression flags. These are the modern
+      // Chrome / Edge / Safari builtins — they're surprisingly good in
+      // 2026 (echo cancellation handles speakers, noise suppression
+      // handles AC + room rumble + keyboard).
+      stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+          channelCount: 1,
+        },
+        video: false,
+      });
+    } catch (e) {
+      const msg = (e as Error).message || "microphone permission denied";
+      setError(msg);
+      opts.onError?.(msg);
+      return;
+    }
+
+    // Web Audio post-processing on top of the browser flags: a highpass
+    // at 100Hz to cut low rumble that NS sometimes lets through, plus a
+    // dynamics compressor to even out volume between phrases. This is
+    // the 'synthesised' audio the user asked for.
+    let ctx: AudioContext;
+    let processedStream: MediaStream;
+    let analyser: AnalyserNode;
+    try {
+      const Ctx: typeof AudioContext =
+        (window.AudioContext as typeof AudioContext) ||
+        // @ts-expect-error - webkit prefix on older Safari
+        window.webkitAudioContext;
+      ctx = new Ctx();
+      const source = ctx.createMediaStreamSource(stream);
+      const highpass = ctx.createBiquadFilter();
+      highpass.type = "highpass";
+      highpass.frequency.value = 100; // Hz
+      const compressor = ctx.createDynamicsCompressor();
+      compressor.threshold.value = -32;
+      compressor.knee.value = 12;
+      compressor.ratio.value = 4;
+      compressor.attack.value = 0.005;
+      compressor.release.value = 0.12;
+      analyser = ctx.createAnalyser();
+      analyser.fftSize = 1024;
+      const dest = ctx.createMediaStreamDestination();
+      // Chain: source → highpass → compressor → analyser → dest
+      source.connect(highpass);
+      highpass.connect(compressor);
+      compressor.connect(analyser);
+      analyser.connect(dest);
+      processedStream = dest.stream;
+    } catch (e) {
+      // If Web Audio isn't available (very old browser), record raw.
+      console.warn("voice: Web Audio unavailable, recording raw stream:", e);
+      processedStream = stream;
+      ctx = new (window.AudioContext as typeof AudioContext)();
+      const fallbackSource = ctx.createMediaStreamSource(stream);
+      analyser = ctx.createAnalyser();
+      analyser.fftSize = 1024;
+      fallbackSource.connect(analyser);
+    }
+
+    streamRef.current = stream;
+    audioCtxRef.current = ctx;
+
+    const mime = pickRecorderMime();
+    let rec: MediaRecorder;
+    try {
+      rec = mime
+        ? new MediaRecorder(processedStream, { mimeType: mime })
+        : new MediaRecorder(processedStream);
+    } catch (e) {
+      const msg =
+        "this browser doesn't support audio recording (try Chrome / Edge / Safari)";
+      setError(msg);
+      opts.onError?.(msg);
+      teardown();
+      return;
+    }
+    recRef.current = rec;
+
+    rec.ondataavailable = (ev) => {
+      if (ev.data && ev.data.size > 0) chunksRef.current.push(ev.data);
+    };
+    rec.onstop = async () => {
+      const recordedMime = rec.mimeType || "audio/webm";
+      // Snapshot before teardown nulls the refs.
+      const blob = new Blob(chunksRef.current, { type: recordedMime });
+      teardown();
+      setActive(false);
+      if (blob.size < 800) {
+        // Effectively silence — skip the upload to spare AWS credits.
+        opts.onError?.("didn't catch any speech, try again");
+        return;
+      }
+      setTranscribing(true);
+      try {
+        const fd = new FormData();
+        fd.set("file", blob, "voice." + (recordedMime.includes("ogg") ? "ogg" : recordedMime.includes("mp4") ? "m4a" : "webm"));
+        const r = await fetch(`${BACKEND_URL}/voice/transcribe`, {
+          method: "POST",
+          headers: { ...authHeader() },
+          body: fd,
+        });
+        if (!r.ok) {
+          const body = await r.text();
+          let detail = body;
+          try {
+            detail = JSON.parse(body).detail ?? body;
+          } catch {
+            // not JSON
+          }
+          throw new Error(detail || `${r.status} ${r.statusText}`);
+        }
+        const out = (await r.json()) as { transcript: string };
+        const text = (out.transcript || "").trim();
+        if (text) {
+          opts.onFinal(text);
+        } else {
+          opts.onError?.("transcribe came back empty");
+        }
+      } catch (e) {
+        const msg = (e as Error).message;
+        setError(msg);
+        opts.onError?.(msg);
+      } finally {
+        setTranscribing(false);
+      }
+    };
+
+    // Live mic-level meter — drives the visual on the mic button so the
+    // user knows we're actually capturing them.
+    const buf = new Uint8Array(analyser.fftSize);
+    function pumpMeter() {
+      if (!recRef.current) return;
+      analyser.getByteTimeDomainData(buf);
+      let sum = 0;
+      for (let i = 0; i < buf.length; i++) {
+        const v = (buf[i] - 128) / 128;
+        sum += v * v;
+      }
+      const rms = Math.sqrt(sum / buf.length);
+      // Normalise to a friendlier 0..1; log-shape so quiet voice still bumps.
+      const norm = Math.min(1, Math.log10(1 + rms * 30) / 1.3);
+      setLevel(norm);
+      meterRafRef.current = requestAnimationFrame(pumpMeter);
+    }
+    meterRafRef.current = requestAnimationFrame(pumpMeter);
+
+    rec.start(250); // emit dataavailable every 250ms
+
+    if (opts.maxDurationMs && opts.maxDurationMs > 0) {
+      stopTimerRef.current = setTimeout(() => {
+        try {
+          rec.stop();
+        } catch {
+          // ignore — already stopped
+        }
+      }, opts.maxDurationMs);
+    }
+
+    setActive(true);
+  }
+
+  function stop() {
+    if (!active) return;
+    try {
+      recRef.current?.stop();
+    } catch {
+      // already stopped
+    }
+  }
+
+  return { active, level, transcribing, error, start, stop };
+}
+
+/** Pick a clean voice if the browser has one. Order of preference:
  *  - en-US Google US English
  *  - en-US Microsoft Aria / Jenny
  *  - any en-* voice with "natural" or "neural" in the name
@@ -174,8 +319,7 @@ function pickVoice(): SpeechSynthesisVoice | null {
   }
   const voices = window.speechSynthesis.getVoices();
   if (!voices.length) {
-    // Voices load asynchronously on some browsers — caller will retry.
-    return null;
+    return null; // populate is async on Chrome; caller will retry.
   }
   const en = voices.filter((v) => v.lang.startsWith("en"));
   const score = (v: SpeechSynthesisVoice): number => {
@@ -197,7 +341,6 @@ function pickVoice(): SpeechSynthesisVoice | null {
 export function speakText(text: string, opts?: { rate?: number; pitch?: number }) {
   if (!isTtsSupported() || !text.trim()) return;
   const synth = window.speechSynthesis;
-  // Cancel any in-flight utterance — the most-recent reply wins.
   try {
     synth.cancel();
   } catch {
@@ -220,15 +363,11 @@ export function stopSpeaking() {
   }
 }
 
-/** Some browsers populate the voice list asynchronously. Pre-warm so the
- *  first speakText() call has a voice immediately. */
 export function warmVoices() {
   if (!isTtsSupported()) return;
-  // Trigger an initial fetch
   window.speechSynthesis.getVoices();
-  // Listen for the voiceschanged event (Chrome) and re-cache.
   const onChange = () => {
-    _cachedVoice = undefined; // invalidate
+    _cachedVoice = undefined;
     pickVoice();
   };
   window.speechSynthesis.addEventListener("voiceschanged", onChange, {
@@ -236,21 +375,15 @@ export function warmVoices() {
   });
 }
 
-/** Clean up Markdown / citation noise before sending to TTS so the synth
- *  doesn't read out asterisks, brackets, code fences. */
+/** Strip Markdown / citation noise so TTS reads cleanly. */
 export function cleanForSpeech(text: string): string {
   return text
-    // Strip our citation chips
     .replace(/\[[a-z_]+(?::[^\]]+)?\]/gi, "")
-    // Strip bold/italic markers
     .replace(/\*\*([^*]+)\*\*/g, "$1")
     .replace(/\*([^*]+)\*/g, "$1")
     .replace(/_([^_]+)_/g, "$1")
-    // Strip inline code
     .replace(/`([^`]+)`/g, "$1")
-    // Collapse markdown links to just the text
     .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
-    // Collapse whitespace
     .replace(/\s+/g, " ")
     .trim();
 }

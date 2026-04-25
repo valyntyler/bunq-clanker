@@ -712,6 +712,102 @@ def me_analyses(
     }
 
 
+# ---- voice transcribe — short clips for the chat-panel mic button ----
+
+
+@app.post("/voice/transcribe")
+async def voice_transcribe(
+    file: UploadFile = File(...),
+    user: User = Depends(require_user),
+) -> dict:
+    """One-shot transcription of a short browser-recorded audio clip.
+
+    The frontend records via MediaRecorder with noiseSuppression /
+    echoCancellation / autoGainControl flags set on getUserMedia, plus a
+    Web Audio API highpass + compressor pre-stage. The resulting blob is
+    POSTed here. We hand it to AWS Transcribe (single batch job, polled)
+    and return the transcript text.
+
+    Accepts: image/* — sorry, audio/* (webm, ogg, m4a, mp3, wav, flac).
+    Caps at 6MB to keep the demo fast.
+    """
+    if not (file.content_type or "").startswith("audio/"):
+        raise HTTPException(400, f"audio/* required (got {file.content_type})")
+    raw = await file.read()
+    if not raw:
+        raise HTTPException(400, "empty audio")
+    if len(raw) > 6 * 1024 * 1024:
+        raise HTTPException(413, "audio clip too large (max 6MB / ~60s)")
+
+    # Map browser MIME → AWS Transcribe MediaFormat.
+    ctype = (file.content_type or "").lower()
+    fmt: str
+    if "webm" in ctype:
+        fmt = "webm"
+    elif "ogg" in ctype:
+        fmt = "ogg"
+    elif "mp4" in ctype or "m4a" in ctype:
+        fmt = "mp4"
+    elif "mpeg" in ctype or "mp3" in ctype:
+        fmt = "mp3"
+    elif "wav" in ctype:
+        fmt = "wav"
+    else:
+        fmt = "webm"
+
+    from backend.aws import put_bytes
+    from backend.scrapers.geopolitical_clips import transcribe_via_aws
+
+    suffix = {"webm": "webm", "ogg": "ogg", "mp4": "m4a", "mp3": "mp3", "wav": "wav"}.get(fmt, "webm")
+    key = f"voice/{datetime.now(timezone.utc).strftime('%Y%m%d')}/{os.urandom(6).hex()}.{suffix}"
+    s3_uri = await asyncio.to_thread(
+        put_bytes, key, raw, content_type=file.content_type or "audio/webm"
+    )
+
+    try:
+        # transcribe_via_aws() defaults to wav; we patch the format inline.
+        # The function is short enough that we do the call directly here.
+        import boto3, time as _time, uuid as _uuid, httpx as _httpx
+        from backend.aws import REGION
+        client = boto3.client("transcribe", region_name=REGION)
+        job_name = f"sauron-voice-{_uuid.uuid4().hex[:10]}"
+        client.start_transcription_job(
+            TranscriptionJobName=job_name,
+            Media={"MediaFileUri": s3_uri},
+            MediaFormat=fmt,
+            LanguageCode="en-US",
+        )
+        # Poll up to ~30s — voice clips are short so jobs complete fast.
+        for _ in range(20):
+            await asyncio.sleep(1.5)
+            j = client.get_transcription_job(TranscriptionJobName=job_name)
+            status = j["TranscriptionJob"]["TranscriptionJobStatus"]
+            if status == "COMPLETED":
+                uri = j["TranscriptionJob"]["Transcript"]["TranscriptFileUri"]
+                data = _httpx.get(uri, timeout=15).json()
+                text = (
+                    data.get("results", {})
+                    .get("transcripts", [{}])[0]
+                    .get("transcript", "")
+                ).strip()
+                return {
+                    "transcript": text,
+                    "duration_s": None,
+                    "format": fmt,
+                    "bytes": len(raw),
+                }
+            if status == "FAILED":
+                raise RuntimeError(
+                    j["TranscriptionJob"].get("FailureReason", "transcribe failed")
+                )
+        raise HTTPException(504, "transcribe timed out (>30s)")
+    except HTTPException:
+        raise
+    except Exception as e:  # noqa: BLE001
+        log.exception("voice transcribe failed")
+        raise HTTPException(503, f"transcribe failed: {e}")
+
+
 # ---- live earnings-call co-pilot -------------------------------------
 
 
