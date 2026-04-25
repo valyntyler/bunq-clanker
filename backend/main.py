@@ -315,6 +315,83 @@ def ipos_detail(slug: str, user: User = Depends(require_user)) -> dict:
     return {"brief": brief, "thesis": thesis}
 
 
+@app.get("/trending")
+async def trending(
+    hours: int = 168,           # default 7 days
+    limit: int = 12,
+    include_spark: bool = True,
+    user: User = Depends(require_user),
+    session: Session = Depends(get_session),
+) -> dict:
+    """Top tickers analyzed across all users in the last `hours` window.
+
+    Returns aggregated counts plus the most-recent verdict per ticker and
+    (optionally) a 30-day daily-close sparkline from yfinance.
+    """
+    from datetime import timedelta
+    from sqlalchemy import func as sa_func
+
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
+
+    rows = session.exec(
+        select(
+            AnalysisRun.ticker,
+            sa_func.count(AnalysisRun.id).label("n"),
+            sa_func.max(AnalysisRun.created_at).label("last_at"),
+        )
+        .where(AnalysisRun.created_at >= cutoff)
+        .group_by(AnalysisRun.ticker)
+        .order_by(sa_func.count(AnalysisRun.id).desc())
+        .limit(limit)
+    ).all()
+
+    out: list[dict] = []
+    for r in rows:
+        ticker = r[0]
+        n = int(r[1])
+        last_at = r[2]
+        latest = session.exec(
+            select(AnalysisRun)
+            .where(AnalysisRun.ticker == ticker)
+            .order_by(AnalysisRun.created_at.desc())
+            .limit(1)
+        ).first()
+        if last_at is not None and last_at.tzinfo is None:
+            last_at = last_at.replace(tzinfo=timezone.utc)
+        out.append(
+            {
+                "ticker": ticker,
+                "company_name": (latest.company_name if latest else ticker) or ticker,
+                "search_count": n,
+                "last_at": last_at.isoformat() if last_at else None,
+                "latest_verdict": latest.verdict if latest else None,
+                "latest_confidence": latest.confidence if latest else None,
+                "one_liner": latest.one_liner if latest else None,
+            }
+        )
+
+    if include_spark and out:
+        async def _fetch_spark(ticker: str) -> tuple[list[float], str | None]:
+            try:
+                bars, currency = await asyncio.to_thread(
+                    fetch_ohlcv, ticker, "1mo"
+                )
+                return [b["close"] for b in bars], currency
+            except Exception:  # noqa: BLE001
+                return [], None
+
+        sparks = await asyncio.gather(*[_fetch_spark(r["ticker"]) for r in out])
+        for entry, (closes, currency) in zip(out, sparks):
+            entry["spark"] = closes
+            entry["currency"] = currency
+
+    return {
+        "as_of": datetime.now(timezone.utc).isoformat(),
+        "window_hours": hours,
+        "trending": out,
+    }
+
+
 @app.get("/me/investments")
 def me_investments(
     user: User = Depends(require_user),

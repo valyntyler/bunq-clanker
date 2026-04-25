@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { AuthGuard } from "@/components/AuthGuard";
 import { NearbyTickersPicker } from "@/components/NearbyTickers";
+import { TrendingTickers } from "@/components/TrendingTickers";
 import { validateTicker } from "@/lib/api";
 
 export default function LandingPage() {
@@ -144,6 +145,8 @@ function Landing() {
         </div>
 
         <NearbyTickersPicker onPick={(t, coords) => go(t.ticker, coords)} />
+
+        <TrendingTickers />
 
         <footer className="pt-4 text-[11px] leading-relaxed text-[var(--bunq-faint)]">
           Hackathon prototype. Not financial advice. Bunq sandbox + Alpaca

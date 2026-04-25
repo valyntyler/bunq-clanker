@@ -468,6 +468,35 @@ export async function panelData(
   );
 }
 
+// ---- trending (cross-user search history) ------------------------------
+
+export interface TrendingTicker {
+  ticker: string;
+  company_name: string;
+  search_count: number;
+  last_at: string | null;
+  latest_verdict: "BUY" | "HOLD" | "AVOID" | null;
+  latest_confidence: number | null;
+  one_liner: string | null;
+  spark: number[];
+  currency: string | null;
+}
+
+export async function getTrending(opts?: {
+  hours?: number;
+  limit?: number;
+}): Promise<{
+  as_of: string;
+  window_hours: number;
+  trending: TrendingTicker[];
+}> {
+  const qs = new URLSearchParams();
+  if (opts?.hours !== undefined) qs.set("hours", String(opts.hours));
+  if (opts?.limit !== undefined) qs.set("limit", String(opts.limit));
+  const url = `${BACKEND_URL}/trending${qs.toString() ? `?${qs}` : ""}`;
+  return j(await authFetch(url));
+}
+
 // ---- pre-IPO calendar ---------------------------------------------------
 
 export interface IpoBrief {
