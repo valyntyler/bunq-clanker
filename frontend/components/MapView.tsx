@@ -23,13 +23,13 @@ import { locationsHqs, type MapHq } from "@/lib/api";
  * we ever want a dark variant.
  */
 
+// CartoDB Dark Matter — matches the Bunq dark palette and serves
+// reliably without an API key (anonymous fair-use).
 const TILE_URL =
-  "https://tiles.openfreemap.org/styles/positron/{z}/{x}/{y}@2x.png";
-// Fallback if openfreemap is down — CartoDB has fair-use anonymous access.
-const FALLBACK_TILE_URL =
-  "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png";
+  "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
+const TILE_SUBDOMAINS = ["a", "b", "c", "d"];
 const TILE_ATTRIBUTION =
-  "&copy; OpenMapTiles &copy; OpenStreetMap contributors";
+  "&copy; <a href='https://www.openstreetmap.org/copyright'>OpenStreetMap</a> contributors &copy; <a href='https://carto.com/attributions'>CARTO</a>";
 
 const VERDICT_COLOR: Record<NonNullable<MapHq["verdict"]>, string> = {
   BUY: "#b5ff00",
@@ -115,17 +115,9 @@ export function MapView() {
           <TileLayer
             attribution={TILE_ATTRIBUTION}
             url={TILE_URL}
+            subdomains={TILE_SUBDOMAINS}
             maxZoom={19}
-            // Render at @2x for crisp marker outlines.
             crossOrigin
-            // If openfreemap's CDN ever 404s, react-leaflet keeps the layer
-            // visible with previously-loaded tiles. We ship the fallback
-            // URL for users to swap in if needed.
-            eventHandlers={{
-              tileerror: () => {
-                /* fall through to cached tiles */
-              },
-            }}
           />
           {userLoc && (
             <CircleMarker
@@ -195,11 +187,16 @@ export function MapView() {
           <div
             className="rounded-2xl px-3 py-2 text-xs"
             style={{
-              background: "var(--bunq-bad-soft)",
-              color: "var(--bunq-bad)",
+              background: "var(--bunq-surface-2)",
+              color: "var(--bunq-muted)",
+              border: "1px solid var(--bunq-border)",
             }}
           >
-            {error}
+            {error.toLowerCase().includes("denied") ||
+            error.toLowerCase().includes("unavailable") ||
+            error.toLowerCase().includes("timeout")
+              ? `Couldn't read your location (${error.toLowerCase()}). The map still works without it.`
+              : error}
           </div>
         )}
       </aside>
