@@ -137,6 +137,30 @@ def latest_price(symbol: str) -> float | None:
         return None
 
 
+def fetch_ohlcv(symbol: str, period: str = "1y") -> list[dict]:
+    """Returns daily OHLCV bars as a list of dicts ready for Recharts.
+
+        [{"date": "2025-04-25", "open": 130.1, "high": 132.4, "low": 129.5,
+          "close": 131.8, "volume": 45_000_000}, …]
+    """
+    hist = _ticker(symbol).history(period=period)
+    if hist.empty:
+        return []
+    out: list[dict] = []
+    for ts, row in hist.iterrows():
+        out.append(
+            {
+                "date": ts.strftime("%Y-%m-%d"),
+                "open": float(row["Open"]),
+                "high": float(row["High"]),
+                "low": float(row["Low"]),
+                "close": float(row["Close"]),
+                "volume": float(row["Volume"]) if "Volume" in row else 0.0,
+            }
+        )
+    return out
+
+
 def validate_ticker(symbol: str) -> tuple[bool, str | None]:
     """Cheap existence check via yfinance. Returns (is_valid, name_if_valid).
 

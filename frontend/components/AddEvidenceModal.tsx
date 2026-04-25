@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Modal } from "@/components/Modal";
 import {
   submitEvidence,
   uploadEvidenceStream,
@@ -100,8 +101,6 @@ export function AddEvidenceModal({
     Record<string, { status: UploadStepEvent["status"]; detail?: Record<string, unknown> }>
   >({});
 
-  if (!open) return null;
-
   function reset() {
     setUrl("");
     setText("");
@@ -182,14 +181,8 @@ export function AddEvidenceModal({
         : "Add to analysis";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 px-4">
-      <div
-        className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-3xl border p-6 shadow-2xl"
-        style={{
-          background: "var(--bunq-surface)",
-          borderColor: "var(--bunq-border)",
-        }}
-      >
+    <Modal open={open} onClose={onClose} size="lg" ariaLabel="Add evidence">
+      <>
         <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--bunq-green)]">
           <span
             className="inline-flex h-4 w-4 items-center justify-center rounded-full text-[9px] font-black"
@@ -422,8 +415,8 @@ export function AddEvidenceModal({
             {pending ? "Analyzing…" : submitLabel}
           </button>
         </div>
-      </div>
-    </div>
+      </>
+    </Modal>
   );
 }
 

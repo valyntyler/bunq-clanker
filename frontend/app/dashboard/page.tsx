@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { AuthGuard } from "@/components/AuthGuard";
 import { Markdown } from "@/components/Markdown";
+import { UserSourcePreview } from "@/components/SourcePreview";
 import {
   meAnalyses,
   meEvidence,
@@ -12,6 +13,7 @@ import {
   type EvidenceRow,
   type InvestmentList,
   type InvestmentRow,
+  type UserSource,
 } from "@/lib/api";
 
 export default function DashboardPage() {
@@ -27,6 +29,7 @@ function Dashboard() {
   const [ev, setEv] = useState<EvidenceRow[] | null>(null);
   const [an, setAn] = useState<AnalysisRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [previewSource, setPreviewSource] = useState<UserSource | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -177,7 +180,11 @@ function Dashboard() {
         ) : (
           <div className="space-y-2">
             {ev.map((e) => (
-              <EvidenceRowView key={e.id} e={e} />
+              <EvidenceRowView
+                key={e.id}
+                e={e}
+                onExpand={(src) => setPreviewSource(src)}
+              />
             ))}
           </div>
         )}
@@ -197,6 +204,12 @@ function Dashboard() {
           </div>
         )}
       </Section>
+
+      <UserSourcePreview
+        source={previewSource}
+        open={previewSource !== null}
+        onClose={() => setPreviewSource(null)}
+      />
     </main>
   );
 }
@@ -398,7 +411,13 @@ function StatusPill({ status }: { status: string }) {
   );
 }
 
-function EvidenceRowView({ e }: { e: EvidenceRow }) {
+function EvidenceRowView({
+  e,
+  onExpand,
+}: {
+  e: EvidenceRow;
+  onExpand: (src: UserSource) => void;
+}) {
   return (
     <div
       className="rounded-2xl p-4"
@@ -452,6 +471,32 @@ function EvidenceRowView({ e }: { e: EvidenceRow }) {
         text={e.summary}
         className="mt-2 text-sm text-[var(--bunq-text)]/90"
       />
+      <div className="mt-3 flex justify-end">
+        <button
+          onClick={() =>
+            onExpand({
+              source_id: e.id,
+              source_type:
+                e.source_type as UserSource["source_type"],
+              origin: e.origin,
+              user_note: e.user_note,
+              user_tag: e.user_tag as UserSource["user_tag"],
+              score: e.score,
+              summary: e.summary,
+              key_claims: [],
+              trust_level: e.trust_level as UserSource["trust_level"],
+            })
+          }
+          className="rounded-full px-3 py-1 font-mono text-[10px] uppercase tracking-[0.16em]"
+          style={{
+            background: "var(--bunq-green-soft)",
+            color: "var(--bunq-green)",
+            border: "1px solid rgba(181,255,0,0.30)",
+          }}
+        >
+          expand ↗
+        </button>
+      </div>
     </div>
   );
 }

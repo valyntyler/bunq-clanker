@@ -1,4 +1,5 @@
 import { Markdown } from "@/components/Markdown";
+import { PriceChart } from "@/components/PriceChart";
 import type { Section } from "@/lib/api";
 
 function scoreColor(score: number) {
@@ -16,9 +17,13 @@ function scoreLabel(score: number) {
 export function SectionCard({
   name,
   section,
+  ticker,
 }: {
   name: string;
   section: Section;
+  /** When the section is the chart-vision module, render an interactive
+   * Recharts price chart underneath the static PNG that Claude analyzed. */
+  ticker?: string;
 }) {
   const extra = (section.extra ?? {}) as {
     image_url?: string;
@@ -50,6 +55,14 @@ export function SectionCard({
             loading="lazy"
           />
         </a>
+      )}
+      {name === "chart" && ticker && (
+        <div className="px-3 pt-3">
+          <div className="mb-1 font-mono text-[9px] uppercase tracking-[0.18em] text-[var(--bunq-faint)]">
+            interactive · 1y close
+          </div>
+          <PriceChart ticker={ticker} />
+        </div>
       )}
       <div className="p-5">
         <div className="flex items-baseline justify-between">

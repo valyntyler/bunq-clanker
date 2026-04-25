@@ -75,7 +75,7 @@ from fastapi import Depends
 from backend.orchestrator import analyze_async, analyze_stream
 from backend.scrapers.compress import compress_audio, compress_image, compress_video
 from backend.scrapers.user_evidence import fetch_url, passthrough_text
-from backend.scrapers.yahoo import validate_ticker
+from backend.scrapers.yahoo import fetch_ohlcv, validate_ticker
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("prospectus")
@@ -819,6 +819,59 @@ def panel(
         return analyze_consumer_panel(ticker.upper())
     except KeyError:
         raise HTTPException(404, f"no panel data for ticker {ticker}")
+
+
+@app.get("/chart-data/{ticker}")
+async def chart_data(
+    ticker: str,
+    period: str = "1y",
+    user: User = Depends(require_user),
+) -> dict:
+    """OHLCV bars for the interactive price chart. Cheap yfinance read."""
+    bars = await asyncio.to_thread(fetch_ohlcv, ticker.upper(), period)
+    if not bars:
+        raise HTTPException(404, f"no price data for {ticker}")
+    return {"ticker": ticker.upper(), "period": period, "bars": bars}
+
+
+@app.get("/panel-data/{ticker}")
+async def panel_data(
+    ticker: str,
+    user: User = Depends(require_user),
+) -> dict:
+    """Monthly panel spend series for the interactive Bunq panel chart.
+
+    Returns 24 months of {month, spend_eur, prior_year_spend_eur}.
+    """
+    import json
+    from pathlib import Path
+
+    fixture = (
+        Path(__file__).parent / "fixtures" / "panel_spend.json"
+    )
+    if not fixture.exists():
+        raise HTTPException(404, "panel fixture missing")
+    data = json.loads(fixture.read_text())
+    entry = data.get(ticker.upper())
+    if not entry:
+        raise HTTPException(404, f"no panel data for {ticker}")
+    months = entry["months"]
+    sorted_keys = sorted(months.keys())
+    series: list[dict] = []
+    for k in sorted_keys:
+        prior_k = f"{int(k[:4]) - 1}-{k[5:]}"
+        series.append(
+            {
+                "month": k,
+                "spend_eur": months[k],
+                "prior_year_eur": months.get(prior_k),
+            }
+        )
+    return {
+        "ticker": ticker.upper(),
+        "panel_size_n": entry["panel_size_n"],
+        "series": series,
+    }
 
 
 @app.get("/validate-ticker/{ticker}")

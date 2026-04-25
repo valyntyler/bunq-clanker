@@ -426,6 +426,40 @@ export async function meAnalyses(): Promise<{ analyses: AnalysisRow[] }> {
   );
 }
 
+export interface OhlcvBar {
+  date: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+}
+
+export async function chartData(
+  ticker: string,
+  period = "1y"
+): Promise<{ ticker: string; period: string; bars: OhlcvBar[] }> {
+  return j(
+    await authFetch(
+      `${BACKEND_URL}/chart-data/${encodeURIComponent(ticker)}?period=${period}`
+    )
+  );
+}
+
+export interface PanelMonth {
+  month: string;
+  spend_eur: number;
+  prior_year_eur: number | null;
+}
+
+export async function panelData(
+  ticker: string
+): Promise<{ ticker: string; panel_size_n: number; series: PanelMonth[] }> {
+  return j(
+    await authFetch(`${BACKEND_URL}/panel-data/${encodeURIComponent(ticker)}`)
+  );
+}
+
 export async function resynthesize(
   req: ResynthesizeRequest
 ): Promise<Report> {

@@ -1,3 +1,4 @@
+import { PanelChart } from "@/components/PanelChart";
 import type { ConsumerPanelForecast } from "@/lib/api";
 
 const DIR_ARROW: Record<string, string> = {
@@ -72,6 +73,10 @@ export function PanelForecastCard({
             value={forecast.historical_correlation.toFixed(2)}
           />
         </div>
+      </div>
+
+      <div className="mt-5">
+        <PanelChart ticker={ticker} />
       </div>
 
       {forecast.merchant_aliases && forecast.merchant_aliases.length > 0 && (

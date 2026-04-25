@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Modal } from "@/components/Modal";
 import {
   bunqBalance,
   invest,
@@ -51,7 +52,6 @@ export function InvestModal({
     };
   }, [open, receipt]);
 
-  if (!open) return null;
 
   async function submit() {
     setPending(true);
@@ -67,14 +67,8 @@ export function InvestModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 px-4">
-      <div
-        className="w-full max-w-md rounded-3xl border p-6 shadow-2xl"
-        style={{
-          background: "var(--bunq-surface)",
-          borderColor: "var(--bunq-border)",
-        }}
-      >
+    <Modal open={open} onClose={onClose} size="md" ariaLabel="Invest">
+      <>
         {!receipt ? (
           <>
             <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--bunq-green)]">
@@ -232,8 +226,8 @@ export function InvestModal({
             </button>
           </>
         )}
-      </div>
-    </div>
+      </>
+    </Modal>
   );
 }
 

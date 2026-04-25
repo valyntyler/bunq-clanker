@@ -22,6 +22,11 @@ import {
   PipelineStatus,
   type PipelineState,
 } from "@/components/PipelineStatus";
+import {
+  GeopoliticalPreview,
+  ImageLightbox,
+  UserSourcePreview,
+} from "@/components/SourcePreview";
 import { UserSourceClaims } from "@/components/UserSourceClaims";
 import { VerdictBanner } from "@/components/VerdictBanner";
 import { SectionCard } from "@/components/SectionCard";
@@ -91,6 +96,9 @@ function AnalyzePage() {
   const [userSources, setUserSources] = useState<UserSource[]>([]);
   const [geoOverlays, setGeoOverlays] = useState<GeopoliticalOverlay[]>([]);
   const [resynthing, setResynthing] = useState(false);
+  const [previewSource, setPreviewSource] = useState<UserSource | null>(null);
+  const [previewOverlay, setPreviewOverlay] =
+    useState<GeopoliticalOverlay | null>(null);
   const startedAt = useRef<number>(0);
 
   useEffect(() => {
@@ -370,7 +378,12 @@ function AnalyzePage() {
           </h2>
           <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
             {Object.entries(sections).map(([name, s]) => (
-              <SectionCard key={name} name={name} section={s} />
+              <SectionCard
+                key={name}
+                name={name}
+                section={s}
+                ticker={ticker}
+              />
             ))}
           </div>
         </section>
@@ -423,6 +436,19 @@ function AnalyzePage() {
                 {u.key_claims && u.key_claims.length > 0 && (
                   <UserSourceClaims claims={u.key_claims} />
                 )}
+                <div className="mt-3 flex justify-end">
+                  <button
+                    onClick={() => setPreviewSource(u)}
+                    className="rounded-full px-3 py-1 font-mono text-[10px] uppercase tracking-[0.16em]"
+                    style={{
+                      background: "var(--bunq-green-soft)",
+                      color: "var(--bunq-green)",
+                      border: "1px solid rgba(181,255,0,0.30)",
+                    }}
+                  >
+                    expand ↗
+                  </button>
+                </div>
               </div>
             ))}
           </div>
@@ -485,19 +511,32 @@ function AnalyzePage() {
                           {g.event_id}
                         </div>
                       </div>
-                      <div className="text-right font-mono text-xs text-[var(--bunq-muted)]">
-                        <div className="bunq-numeral">
-                          rel {g.relevance.toFixed(2)}
+                      <div className="flex flex-col items-end gap-2">
+                        <div className="text-right font-mono text-xs text-[var(--bunq-muted)]">
+                          <div className="bunq-numeral">
+                            rel {g.relevance.toFixed(2)}
+                          </div>
+                          <div className="bunq-numeral">
+                            impact{" "}
+                            {g.impact_direction > 0
+                              ? "+"
+                              : g.impact_direction < 0
+                                ? "−"
+                                : "·"}
+                            {g.impact_magnitude.toFixed(2)}
+                          </div>
                         </div>
-                        <div className="bunq-numeral">
-                          impact{" "}
-                          {g.impact_direction > 0
-                            ? "+"
-                            : g.impact_direction < 0
-                              ? "−"
-                              : "·"}
-                          {g.impact_magnitude.toFixed(2)}
-                        </div>
+                        <button
+                          onClick={() => setPreviewOverlay(g)}
+                          className="rounded-full px-2.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.16em]"
+                          style={{
+                            background: "var(--bunq-green-soft)",
+                            color: "var(--bunq-green)",
+                            border: "1px solid rgba(181,255,0,0.30)",
+                          }}
+                        >
+                          expand ↗
+                        </button>
                       </div>
                     </div>
                     <Markdown
@@ -587,6 +626,18 @@ function AnalyzePage() {
           onClose={() => setInvestOpen(false)}
         />
       )}
+
+      <UserSourcePreview
+        source={previewSource}
+        open={previewSource !== null}
+        onClose={() => setPreviewSource(null)}
+      />
+
+      <GeopoliticalPreview
+        overlay={previewOverlay}
+        open={previewOverlay !== null}
+        onClose={() => setPreviewOverlay(null)}
+      />
 
       <AddEvidenceModal
         ticker={ticker}
