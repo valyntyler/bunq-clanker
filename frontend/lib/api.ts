@@ -435,10 +435,17 @@ export interface OhlcvBar {
   volume: number;
 }
 
+export interface ChartDataResponse {
+  ticker: string;
+  period: string;
+  currency: string | null;
+  bars: OhlcvBar[];
+}
+
 export async function chartData(
   ticker: string,
   period = "1y"
-): Promise<{ ticker: string; period: string; bars: OhlcvBar[] }> {
+): Promise<ChartDataResponse> {
   return j(
     await authFetch(
       `${BACKEND_URL}/chart-data/${encodeURIComponent(ticker)}?period=${period}`
@@ -457,6 +464,50 @@ export async function panelData(
 ): Promise<{ ticker: string; panel_size_n: number; series: PanelMonth[] }> {
   return j(
     await authFetch(`${BACKEND_URL}/panel-data/${encodeURIComponent(ticker)}`)
+  );
+}
+
+// ---- pre-IPO calendar ---------------------------------------------------
+
+export interface IpoBrief {
+  slug: string;
+  company_name: string;
+  sector: string;
+  hq: string;
+  status: string;
+  expected_window: string;
+  expected_listing: string;
+  expected_ticker: string;
+  last_private_valuation_usd_b: number;
+  last_round_date: string;
+  founders: string[];
+  summary: string;
+  highlights: string[];
+  risks: string[];
+}
+
+export interface IpoThesis {
+  bull_case: string;
+  bear_case: string;
+  fair_value_usd_b: { low: number; high: number };
+  catalysts: string[];
+  retail_take: string;
+  confidence: number;
+}
+
+export async function listIpos(): Promise<{
+  as_of: string;
+  disclaimer: string;
+  ipos: IpoBrief[];
+}> {
+  return j(await authFetch(`${BACKEND_URL}/ipos`));
+}
+
+export async function getIpo(
+  slug: string
+): Promise<{ brief: IpoBrief; thesis: IpoThesis }> {
+  return j(
+    await authFetch(`${BACKEND_URL}/ipos/${encodeURIComponent(slug)}`)
   );
 }
 

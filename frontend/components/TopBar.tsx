@@ -32,6 +32,11 @@ export function TopBar() {
       <div className="flex items-center gap-2">
         <NavLink href="/" label="Analyze" active={pathname === "/"} />
         <NavLink
+          href="/ipos"
+          label="IPOs"
+          active={pathname?.startsWith("/ipos") ?? false}
+        />
+        <NavLink
           href="/dashboard"
           label="Dashboard"
           active={pathname?.startsWith("/dashboard") ?? false}

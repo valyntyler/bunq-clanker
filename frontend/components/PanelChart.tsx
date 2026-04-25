@@ -58,9 +58,9 @@ export function PanelChart({ ticker }: { ticker: string }) {
             tick={{ fill: "var(--bunq-faint)", fontSize: 10 }}
             stroke="var(--bunq-border-strong)"
             tickFormatter={(v: number) =>
-              v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v.toFixed(0)
+              v >= 1000 ? `€${(v / 1000).toFixed(0)}k` : `€${v.toFixed(0)}`
             }
-            width={42}
+            width={56}
           />
           <Tooltip
             contentStyle={{

@@ -137,20 +137,27 @@ def latest_price(symbol: str) -> float | None:
         return None
 
 
-def fetch_ohlcv(symbol: str, period: str = "1y") -> list[dict]:
-    """Returns daily OHLCV bars as a list of dicts ready for Recharts.
+def fetch_ohlcv(symbol: str, period: str = "1y") -> tuple[list[dict], str | None]:
+    """Returns (bars, currency) — daily OHLCV bars plus the listing currency
+    pulled from yfinance .info.
 
-        [{"date": "2025-04-25", "open": 130.1, "high": 132.4, "low": 129.5,
-          "close": 131.8, "volume": 45_000_000}, …]
+        bars = [{"date": "2025-04-25", "open": 130.1, "high": 132.4, "low":
+                 129.5, "close": 131.8, "volume": 45_000_000}, …]
+        currency = "USD" / "EUR" / "GBp" / etc.
+
+    The interval auto-scales with the period so 1d gets minute bars and 5y
+    still loads in <1s.
     """
-    hist = _ticker(symbol).history(period=period)
+    interval = _interval_for_period(period)
+    t = _ticker(symbol)
+    hist = t.history(period=period, interval=interval)
     if hist.empty:
-        return []
+        return [], None
     out: list[dict] = []
     for ts, row in hist.iterrows():
         out.append(
             {
-                "date": ts.strftime("%Y-%m-%d"),
+                "date": ts.strftime("%Y-%m-%dT%H:%M:%S"),
                 "open": float(row["Open"]),
                 "high": float(row["High"]),
                 "low": float(row["Low"]),
@@ -158,7 +165,29 @@ def fetch_ohlcv(symbol: str, period: str = "1y") -> list[dict]:
                 "volume": float(row["Volume"]) if "Volume" in row else 0.0,
             }
         )
-    return out
+    try:
+        info = t.info or {}
+        currency = info.get("currency")
+    except Exception:
+        currency = None
+    return out, currency
+
+
+def _interval_for_period(period: str) -> str:
+    """Pick a sensible bar interval for a given period so the chart looks
+    reasonable without timing-out yfinance."""
+    return {
+        "1d": "5m",
+        "5d": "30m",
+        "1mo": "1h",
+        "3mo": "1d",
+        "6mo": "1d",
+        "1y": "1d",
+        "2y": "1d",
+        "5y": "1wk",
+        "10y": "1wk",
+        "max": "1mo",
+    }.get(period, "1d")
 
 
 def validate_ticker(symbol: str) -> tuple[bool, str | None]:

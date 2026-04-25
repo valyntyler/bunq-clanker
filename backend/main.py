@@ -37,6 +37,7 @@ from backend.analyzers.user_video import analyze_user_video
 from backend.integrations import alpaca as alpaca_i
 from backend.integrations import bunq as bunq_i
 from backend.analyzers.chat import chat_once, chat_stream
+from backend.analyzers.ipo_thesis import list_ipos, get_brief as get_ipo_brief, thesis_for
 from backend.analyzers.synthesizer import synthesize
 from backend.auth import (
     create_token,
@@ -170,6 +171,25 @@ def auth_me(user: User = Depends(require_user)) -> dict:
 
 
 # ---- per-user dashboard --------------------------------------------------
+
+
+# ---- pre-IPO ------------------------------------------------------------
+
+
+@app.get("/ipos")
+def ipos_list(user: User = Depends(require_user)) -> dict:
+    """Curated calendar of upcoming / rumored IPOs with the brief view."""
+    return list_ipos()
+
+
+@app.get("/ipos/{slug}")
+def ipos_detail(slug: str, user: User = Depends(require_user)) -> dict:
+    """Brief + Claude thesis for one IPO. Thesis is cached per slug."""
+    brief = get_ipo_brief(slug)
+    if brief is None:
+        raise HTTPException(404, f"unknown IPO slug {slug!r}")
+    thesis = thesis_for(slug)
+    return {"brief": brief, "thesis": thesis}
 
 
 @app.get("/me/investments")
@@ -821,17 +841,30 @@ def panel(
         raise HTTPException(404, f"no panel data for ticker {ticker}")
 
 
+_VALID_PERIODS = {"1d", "5d", "1mo", "3mo", "6mo", "1y", "2y", "5y", "10y", "max"}
+
+
 @app.get("/chart-data/{ticker}")
 async def chart_data(
     ticker: str,
     period: str = "1y",
     user: User = Depends(require_user),
 ) -> dict:
-    """OHLCV bars for the interactive price chart. Cheap yfinance read."""
-    bars = await asyncio.to_thread(fetch_ohlcv, ticker.upper(), period)
+    """OHLCV bars + currency for the interactive price chart."""
+    if period not in _VALID_PERIODS:
+        raise HTTPException(
+            400,
+            f"unsupported period {period!r}; one of {sorted(_VALID_PERIODS)}",
+        )
+    bars, currency = await asyncio.to_thread(fetch_ohlcv, ticker.upper(), period)
     if not bars:
         raise HTTPException(404, f"no price data for {ticker}")
-    return {"ticker": ticker.upper(), "period": period, "bars": bars}
+    return {
+        "ticker": ticker.upper(),
+        "period": period,
+        "currency": currency,
+        "bars": bars,
+    }
 
 
 @app.get("/panel-data/{ticker}")

@@ -1,0 +1,247 @@
+{
+  "as_of": "2026-04-25",
+  "disclaimer": "Hand-curated from public S-1 filings, financial press, and reporting on rumored IPOs. Valuations reflect last-known private rounds or analyst estimates. Not investment advice.",
+  "ipos": [
+    {
+      "slug": "stripe",
+      "company_name": "Stripe, Inc.",
+      "sector": "Fintech / Payments",
+      "hq": "South San Francisco, CA · Dublin, IE",
+      "status": "rumored",
+      "expected_window": "H2 2026",
+      "expected_listing": "NYSE / NASDAQ (TBD)",
+      "expected_ticker": "STRP (rumored)",
+      "last_private_valuation_usd_b": 91.5,
+      "last_round_date": "2024-02",
+      "founders": ["Patrick Collison", "John Collison"],
+      "summary": "Payments infrastructure for the internet. Processes ~$1T in TPV across 50+ countries. Profitable on a cash basis since 2023; tender offer at $91.5B in Feb 2024 hinted at IPO timing. Direct competitor: Adyen.",
+      "highlights": [
+        "Total payment volume ~$1T+ FY 2024",
+        "Tender offer Feb 2024 at $91.5B valuation",
+        "Acquired Bridge (stablecoins) for $1.1B in 2024",
+        "Cash-flow positive; eyeing public-market liquidity"
+      ],
+      "risks": [
+        "Valuation reset risk vs Adyen multiple compression",
+        "Take-rate pressure from large enterprise customers",
+        "Crypto / stablecoin regulatory drag post-Bridge acquisition"
+      ]
+    },
+    {
+      "slug": "databricks",
+      "company_name": "Databricks, Inc.",
+      "sector": "Data infrastructure / AI",
+      "hq": "San Francisco, CA",
+      "status": "filed-confidentially",
+      "expected_window": "Q3-Q4 2026",
+      "expected_listing": "NASDAQ",
+      "expected_ticker": "DBRX (rumored)",
+      "last_private_valuation_usd_b": 62.0,
+      "last_round_date": "2024-12",
+      "founders": ["Ali Ghodsi", "Reynold Xin", "Matei Zaharia"],
+      "summary": "Lakehouse data platform with ~$3B ARR. Closed $10B Series J in Dec 2024 at $62B; bankers retained for an IPO window in late 2026 per WSJ reporting.",
+      "highlights": [
+        "$3B ARR with 60%+ growth FY 2024",
+        "Acquired MosaicML for $1.3B in 2023 (open-source LLM training)",
+        "Customers include 60% of Fortune 500"
+      ],
+      "risks": [
+        "Snowflake price-pressure on storage/compute pricing",
+        "AI training capex cycle could compress margins",
+        "Late-cycle valuation: priced for perfect execution"
+      ]
+    },
+    {
+      "slug": "klarna",
+      "company_name": "Klarna Bank AB",
+      "sector": "Fintech / BNPL",
+      "hq": "Stockholm, Sweden",
+      "status": "filed",
+      "expected_window": "Q2 2026",
+      "expected_listing": "NYSE",
+      "expected_ticker": "KLAR",
+      "last_private_valuation_usd_b": 14.6,
+      "last_round_date": "2024-11",
+      "founders": ["Sebastian Siemiatkowski", "Niklas Adalberth"],
+      "summary": "Buy-now-pay-later pioneer turned full-service neobank. F-1 filed publicly in Nov 2024, return to profitability in 2024 after 2022 markdown from $46B to $6.7B.",
+      "highlights": [
+        "Returned to profitability Q1 2024 after AI-driven cost cuts",
+        "150M+ active users across 24 countries",
+        "$100B+ in GMV"
+      ],
+      "risks": [
+        "Credit-loss exposure if European consumer weakens",
+        "Affirm + Apple Pay Later competitive squeeze",
+        "Regulatory: EU/UK BNPL rules tightening 2026"
+      ]
+    },
+    {
+      "slug": "shein",
+      "company_name": "Shein Group Ltd.",
+      "sector": "E-commerce / fast fashion",
+      "hq": "Singapore (originally China)",
+      "status": "filed-confidentially",
+      "expected_window": "H2 2026 (London)",
+      "expected_listing": "London Stock Exchange",
+      "expected_ticker": "SHEIN.L (rumored)",
+      "last_private_valuation_usd_b": 66.0,
+      "last_round_date": "2023-05",
+      "founders": ["Chris Xu (Xu Yangtian)"],
+      "summary": "Ultra-fast-fashion marketplace; switched from US to UK listing in 2024 after FBI / SEC scrutiny. ~$45B in 2024 GMV per analyst estimates.",
+      "highlights": [
+        "Estimated $45B GMV in 2024",
+        "Pivoted from NYC to London listing path mid-2024",
+        "Logistics network: <2 weeks design-to-doorstep"
+      ],
+      "risks": [
+        "De minimis import-duty closure (US tariff overhang)",
+        "Forced-labor / supply-chain audit findings",
+        "China-listing geopolitical risk"
+      ]
+    },
+    {
+      "slug": "discord",
+      "company_name": "Discord, Inc.",
+      "sector": "Consumer internet / community platforms",
+      "hq": "San Francisco, CA",
+      "status": "rumored",
+      "expected_window": "2026",
+      "expected_listing": "NYSE / NASDAQ",
+      "expected_ticker": "DISC (rumored)",
+      "last_private_valuation_usd_b": 14.7,
+      "last_round_date": "2021-09",
+      "founders": ["Jason Citron", "Stanislav Vishnevskiy"],
+      "summary": "Real-time community platform with 200M+ MAU. Hired new CFO 2024, retained Goldman in early 2025 — IPO speculation has been steady through 2026.",
+      "highlights": [
+        "200M+ monthly active users; 19M weekly active servers",
+        "Subscription Nitro reaching $700M ARR per leak",
+        "Refused $12B Microsoft offer in 2021"
+      ],
+      "risks": [
+        "Monetization vs free-tier loyalty tension",
+        "Content-moderation liability (CSAM, extremism flares)",
+        "Has been publicly profitable for one quarter (Q4-23) only"
+      ]
+    },
+    {
+      "slug": "chime",
+      "company_name": "Chime Financial, Inc.",
+      "sector": "Neobank / Consumer fintech",
+      "hq": "San Francisco, CA",
+      "status": "filed",
+      "expected_window": "Q2 2026",
+      "expected_listing": "NASDAQ",
+      "expected_ticker": "CHYM",
+      "last_private_valuation_usd_b": 25.0,
+      "last_round_date": "2021-08",
+      "founders": ["Chris Britt", "Ryan King"],
+      "summary": "US neobank focused on lower-income earners; S-1 filed Nov 2024, $1.7B Q3 2024 revenue, ~7M+ active accounts.",
+      "highlights": [
+        "~$1.7B Q3 2024 revenue (~30% YoY)",
+        "Launched MyPay early-paycheck product 2024",
+        "7M+ active members"
+      ],
+      "risks": [
+        "Interchange-fee regulation (Durbin amendments) downside",
+        "Last private valuation $25B may reset 30-50% lower",
+        "Concentration in cash-strapped consumer segment"
+      ]
+    },
+    {
+      "slug": "spacex",
+      "company_name": "SpaceX (hypothetical Starlink IPO)",
+      "sector": "Space / Satellite communications",
+      "hq": "Hawthorne, CA",
+      "status": "rumored-spinout",
+      "expected_window": "2026-2027",
+      "expected_listing": "NASDAQ (Starlink only)",
+      "expected_ticker": "STAR (rumored)",
+      "last_private_valuation_usd_b": 350.0,
+      "last_round_date": "2024-12",
+      "founders": ["Elon Musk", "Tom Mueller"],
+      "summary": "SpaceX itself remains private at $350B; persistent Musk comments suggest spinning out Starlink (LEO satellite broadband) once cash flow stabilises. Speculative timing.",
+      "highlights": [
+        "Starlink reached cash-flow break-even in 2024",
+        "5M+ Starlink subscribers across 100+ countries",
+        "SpaceX overall valuation $350B in Dec 2024 tender"
+      ],
+      "risks": [
+        "Highly Musk-dependent governance",
+        "Frequency / spectrum disputes (FCC, EU)",
+        "Spinout timing entirely at controlling-shareholder discretion"
+      ]
+    },
+    {
+      "slug": "canva",
+      "company_name": "Canva Pty Ltd.",
+      "sector": "Productivity / Design SaaS",
+      "hq": "Sydney, Australia",
+      "status": "rumored",
+      "expected_window": "H1 2027",
+      "expected_listing": "NASDAQ (or ASX)",
+      "expected_ticker": "CNVA (rumored)",
+      "last_private_valuation_usd_b": 32.0,
+      "last_round_date": "2024-10",
+      "founders": ["Melanie Perkins", "Cliff Obrecht"],
+      "summary": "Web-based design platform with 200M+ monthly users and ~$3B ARR. Profitable; CFO hired 2023, secondary tenders Oct 2024 at $32B.",
+      "highlights": [
+        "200M+ MAU, 24M paying subscribers",
+        "~$3B ARR, profitable",
+        "Acquired Affinity (vector design) for $380M in 2024"
+      ],
+      "risks": [
+        "Adobe / Figma price competition",
+        "AI tools commoditizing some workflows",
+        "Australia-domiciled — currency / listing-venue overhang"
+      ]
+    },
+    {
+      "slug": "circle",
+      "company_name": "Circle Internet Financial",
+      "sector": "Crypto / Stablecoins",
+      "hq": "Boston, MA · NYC",
+      "status": "filed-confidentially",
+      "expected_window": "Q2 2026",
+      "expected_listing": "NYSE",
+      "expected_ticker": "CRCL",
+      "last_private_valuation_usd_b": 9.0,
+      "last_round_date": "2022-04",
+      "founders": ["Jeremy Allaire", "Sean Neville"],
+      "summary": "Issuer of USDC ($60B+ in circulation as of 2026). Refiled S-1 in Jan 2025 after first attempt withdrawn 2022. Revenue largely from yield on T-bill reserves.",
+      "highlights": [
+        "USDC $60B+ in circulation",
+        "Strategic stake from BlackRock / IPMorgan",
+        "Listed on Coinbase; counterparty diversification"
+      ],
+      "risks": [
+        "100% of revenue tied to short-rate yield on reserves",
+        "Stablecoin regulatory framework still in flux (US GENIUS Act draft)",
+        "Tether dominance + Coinbase USDC revenue share"
+      ]
+    },
+    {
+      "slug": "cerebras",
+      "company_name": "Cerebras Systems",
+      "sector": "AI / Semiconductors",
+      "hq": "Sunnyvale, CA",
+      "status": "filed",
+      "expected_window": "Q2-Q3 2026",
+      "expected_listing": "NASDAQ",
+      "expected_ticker": "CBRS",
+      "last_private_valuation_usd_b": 4.25,
+      "last_round_date": "2021-11",
+      "founders": ["Andrew Feldman", "Gary Lauterbach", "Sean Lie"],
+      "summary": "AI chip startup making wafer-scale processors as a NVIDIA H100 alternative. S-1 filed 2024 with $136M H1 revenue, but customer concentration (G42) flagged repeatedly.",
+      "highlights": [
+        "Wafer-scale CS-3 chip — 4 trillion transistors",
+        "H1 2024 revenue $136M (vs $9M H1 2023)",
+        "G42 (UAE) signed multi-year contract"
+      ],
+      "risks": [
+        "G42 = 87% of H1 2024 revenue (single-customer risk)",
+        "CFIUS scrutiny of UAE customer relationship",
+        "NVIDIA / AMD / Groq competitive pressure"
+      ]
+    }
+  ]
+}

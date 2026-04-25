@@ -1,17 +1,13 @@
 """Chart-vision analyzer.
 
-Render a 1-year candlestick + volume chart with mplfinance, pass it to
-Claude Sonnet 4's vision with a concrete task list (pattern / support /
-resistance / trend), and emit a Section. The rendered PNG is uploaded to S3
-and a presigned URL returned so the frontend can render the same image the
-model saw.
+Render a 1-year candlestick + volume chart with mplfinance and feed it to
+Claude Sonnet 4 vision for pattern / support / resistance / trend. The PNG
+exists only in-memory for the Claude call — we don't upload or display it,
+because the frontend renders an interactive Recharts price chart instead.
 """
 
 from __future__ import annotations
 
-import base64
-
-from backend.aws import put_and_sign
 from backend.llm import call_claude_json
 from backend.models import Section
 from backend.scrapers.yahoo import render_candlestick_png
@@ -29,10 +25,6 @@ SYSTEM = (
 
 def analyze_chart(symbol: str) -> Section:
     png = render_candlestick_png(symbol, period="1y")
-    # upload + presign for the frontend
-    key = f"charts/{symbol}.png"
-    url = put_and_sign(key, png, content_type="image/png", expires_s=24 * 3600)
-
     user = f"""Analyze the 1-year candlestick chart for {symbol}.
 
 Return STRICT JSON with keys:
@@ -50,7 +42,8 @@ Return STRICT JSON with keys:
         summary=out["summary"],
         sources=[f"yfinance:{symbol}:ohlcv-1y"],
         extra={
-            "image_url": url,
+            # Note: image_url intentionally absent — the frontend renders an
+            # interactive Recharts price chart from /chart-data instead.
             "trend": out.get("trend"),
             "patterns": out.get("patterns", []),
             "support": out.get("support"),

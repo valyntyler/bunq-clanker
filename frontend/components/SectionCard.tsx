@@ -46,21 +46,8 @@ export function SectionCard({
         borderColor: "var(--bunq-border)",
       }}
     >
-      {extra.image_url && (
-        <a href={extra.image_url} target="_blank" rel="noopener noreferrer">
-          <img
-            src={extra.image_url}
-            alt={`${name} chart`}
-            className="aspect-[4/3] w-full bg-black object-cover"
-            loading="lazy"
-          />
-        </a>
-      )}
       {name === "chart" && ticker && (
-        <div className="px-3 pt-3">
-          <div className="mb-1 font-mono text-[9px] uppercase tracking-[0.18em] text-[var(--bunq-faint)]">
-            interactive · 1y close
-          </div>
+        <div className="px-4 pt-4">
           <PriceChart ticker={ticker} />
         </div>
       )}
