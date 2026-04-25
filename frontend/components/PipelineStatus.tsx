@@ -139,8 +139,15 @@ function ModuleCard({ state }: { state: ModuleState | undefined }) {
           <ScoreChip score={state.score} />
         )}
         {state.status === "done" && state.score === undefined && (
-          <span className="font-mono text-[10px] text-[var(--bunq-faint)]">
-            ✓
+          <span
+            className="rounded-full px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.16em]"
+            style={{
+              background: "var(--bunq-surface-2)",
+              color: "var(--bunq-faint)",
+              border: "1px solid var(--bunq-border)",
+            }}
+          >
+            no coverage
           </span>
         )}
       </div>

@@ -1,3 +1,4 @@
+import { Term } from "@/components/Glossary";
 import { Markdown } from "@/components/Markdown";
 import type { Report } from "@/lib/api";
 
@@ -58,16 +59,20 @@ export function VerdictBanner({ report }: { report: Report }) {
 
         <div className="shrink-0 text-right text-[12px]">
           <div className={`rounded-full px-3 py-1 font-mono ${s.chip}`}>
-            <span className="opacity-70">conf </span>
-            <span className="bunq-numeral font-bold">
-              {Math.round(report.confidence * 100)}%
-            </span>
+            <Term term="confidence">
+              <span className="opacity-70">conf </span>
+              <span className="bunq-numeral font-bold">
+                {Math.round(report.confidence * 100)}%
+              </span>
+            </Term>
           </div>
           <div className={`mt-2 rounded-full px-3 py-1 font-mono ${s.chip}`}>
-            <span className="opacity-70">size </span>
-            <span className="bunq-numeral font-bold">
-              {report.position_size_pct.toFixed(1)}%
-            </span>
+            <Term term="position_size">
+              <span className="opacity-70">size </span>
+              <span className="bunq-numeral font-bold">
+                {report.position_size_pct.toFixed(1)}%
+              </span>
+            </Term>
           </div>
 
           {fx && (

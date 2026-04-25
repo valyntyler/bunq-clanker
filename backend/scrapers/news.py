@@ -2,6 +2,12 @@
 
 The NewsAPI path is kept behind the NEWSAPI_KEY env var; if set, it takes
 priority. Otherwise we hit Google News RSS — unlimited, messier, works fine.
+
+Trusted-outlet boost: items from a curated allowlist (Reuters, Bloomberg,
+WSJ, FT, Axios, Politico, AP, AFP, Yahoo Finance, CNBC, NYT, Economist,
+plus the official press-release domains of the largest companies) are
+surfaced first, with the long tail behind. Lets Claude reason from
+better-sourced material first while still seeing the breadth.
 """
 
 from __future__ import annotations

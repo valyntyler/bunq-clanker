@@ -83,6 +83,22 @@ class AnalysisRun(SQLModel, table=True):
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), index=True)
 
 
+class CachedReport(SQLModel, table=True):
+    """Most recent full Report per (user, ticker). Lets the analyze page
+    re-hydrate instantly when the user navigates back instead of re-running
+    the 25-second pipeline. Keep one row per ticker — replace on each new
+    /analyze run.
+    """
+
+    id: str = Field(default_factory=lambda: uuid.uuid4().hex, primary_key=True)
+    user_id: str = Field(foreign_key="user.id", index=True)
+    ticker: str = Field(index=True)
+    report_json: str  # serialized Report.model_dump_json()
+    generated_at: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc), index=True
+    )
+
+
 def init_db() -> None:
     SQLModel.metadata.create_all(engine)
 

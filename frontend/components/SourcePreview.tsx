@@ -46,10 +46,32 @@ export function UserSourcePreview({
         </p>
       )}
 
-      {/* media */}
-      <div className="mt-4">
-        <SourceMedia source={source} large />
-      </div>
+      {/* Render the media block only when there's media worth showing.
+          Plain-text sources become a tighter, less awkward layout. */}
+      {hasVisualMedia(source) && (
+        <div className="mt-4">
+          <SourceMedia source={source} large />
+        </div>
+      )}
+      {source.source_type === "url" && source.origin && (
+        <div
+          className="mt-4 rounded-xl px-3 py-2 text-xs"
+          style={{
+            background: "var(--bunq-surface-2)",
+            border: "1px solid var(--bunq-border)",
+          }}
+        >
+          <a
+            href={source.origin}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="break-all underline decoration-dotted"
+            style={{ color: "var(--bunq-green)" }}
+          >
+            {source.origin}
+          </a>
+        </div>
+      )}
 
       {/* analysis */}
       <div className="mt-5">
@@ -71,7 +93,7 @@ export function UserSourcePreview({
         </div>
       )}
 
-      {source.origin && (
+      {source.origin && hasVisualMedia(source) && (
         <div className="mt-5">
           <a
             href={source.origin}
@@ -232,6 +254,11 @@ export function ImageLightbox({
 }
 
 // ── building blocks ─────────────────────────────────────────────
+
+function hasVisualMedia(source: UserSource): boolean {
+  if (!source.origin) return false;
+  return ["image", "video", "audio", "pdf"].includes(source.source_type);
+}
 
 export function SourceMedia({
   source,

@@ -1,3 +1,4 @@
+import { Term } from "@/components/Glossary";
 import type { BunqSpendingOverlay } from "@/lib/api";
 
 const TREND_ARROW = {
@@ -56,7 +57,9 @@ export function BunqSpendingCard({
         </div>
 
         <div className="text-right">
-          <div className="text-xs text-[var(--bunq-muted)]">conviction</div>
+          <div className="text-xs text-[var(--bunq-muted)]">
+            <Term term="conviction">conviction</Term>
+          </div>
           <div className="bunq-numeral text-3xl font-black text-[var(--bunq-green)]">
             {Math.round(overlay.personal_conviction_score * 100)}
           </div>

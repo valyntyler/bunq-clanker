@@ -536,6 +536,92 @@ export async function searchClips(
   );
 }
 
+/** Stream-ingest a YouTube URL into the analysis as a UserSource.
+ *  Calls onStep per stage (yt_dlp → audio_extract → prosody → frame_grid →
+ *  transcribe → vision_claude); resolves with the final UserSource. */
+export async function ingestUrlStream(args: {
+  url: string;
+  ticker: string;
+  companyName?: string;
+  startS?: number;
+  durationS?: number;
+  userNote?: string;
+  userTag?: EvidenceTag;
+  onStep: (ev: UploadStepEvent) => void;
+  signal?: AbortSignal;
+}): Promise<UserSource> {
+  const r = await authFetch(`${BACKEND_URL}/evidence/from-url/stream`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      url: args.url,
+      ticker: args.ticker,
+      company_name: args.companyName,
+      start_s: args.startS ?? 0,
+      duration_s: args.durationS ?? 60,
+      user_note: args.userNote ?? "",
+      user_tag: args.userTag ?? "neutral",
+    }),
+    signal: args.signal,
+  });
+  if (!r.ok || !r.body) throw new Error(`ingest failed: ${r.status}`);
+  const reader = r.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let result: UserSource | null = null;
+  let error: string | null = null;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    let idx;
+    while ((idx = buffer.indexOf("\n\n")) >= 0) {
+      const chunk = buffer.slice(0, idx);
+      buffer = buffer.slice(idx + 2);
+      for (const line of chunk.split("\n")) {
+        if (!line.startsWith("data: ")) continue;
+        const payload = line.slice(6).trim();
+        if (!payload) continue;
+        try {
+          const ev = JSON.parse(payload);
+          if (ev.step) args.onStep(ev as UploadStepEvent);
+          else if (ev.result) result = ev.result as UserSource;
+          else if (ev.error) error = ev.error;
+        } catch {
+          // ignore parse errors
+        }
+      }
+    }
+  }
+  if (error) throw new Error(error);
+  if (!result) throw new Error("ingest completed without a result");
+  return result;
+}
+
+export interface CachedReportResponse {
+  ticker: string;
+  generated_at: string;
+  age_s: number;
+  report: Report;
+}
+
+export async function getCachedReport(
+  ticker: string
+): Promise<CachedReportResponse | null> {
+  const r = await authFetch(
+    `${BACKEND_URL}/me/reports/${encodeURIComponent(ticker)}/latest`
+  );
+  if (r.status === 404) return null;
+  if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
+  return r.json();
+}
+
+export async function clearCachedReport(ticker: string): Promise<void> {
+  await authFetch(`${BACKEND_URL}/me/reports/${encodeURIComponent(ticker)}`, {
+    method: "DELETE",
+  });
+}
+
 export async function downloadReportPdf(report: Report): Promise<Blob> {
   const r = await authFetch(`${BACKEND_URL}/report/pdf`, {
     method: "POST",

@@ -3,7 +3,9 @@
 import { useParams, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  clearCachedReport,
   downloadReportPdf,
+  getCachedReport,
   resynthesize,
   streamAnalyze,
   type AnalyzeEvent,
@@ -39,6 +41,13 @@ import { InvestModal } from "@/components/InvestModal";
 
 function ts() {
   return new Date().toTimeString().slice(0, 8);
+}
+
+function formatAge(s: number): string {
+  if (s < 60) return `${Math.round(s)}s`;
+  if (s < 3600) return `${Math.round(s / 60)}m`;
+  if (s < 86400) return `${Math.round(s / 3600)}h`;
+  return `${Math.round(s / 86400)}d`;
 }
 
 function SubCard({ label, body }: { label: string; body: string }) {
@@ -102,6 +111,7 @@ function AnalyzePage() {
   const [previewOverlay, setPreviewOverlay] =
     useState<GeopoliticalOverlay | null>(null);
   const [exportingPdf, setExportingPdf] = useState(false);
+  const [fromCache, setFromCache] = useState<{ generatedAt: string; ageS: number } | null>(null);
 
   async function exportPdf() {
     if (!report || exportingPdf) return;
@@ -276,26 +286,99 @@ function AnalyzePage() {
       }
     };
 
-    streamAnalyze(ticker, coords, onEvent, ctrl.signal).catch((e) => {
-      if (ctrl.signal.aborted) return;
-      const msg = (e as Error).message;
-      log(`ERROR: ${msg}`);
-      setErr(msg);
-      setPending(false);
-    });
+    let cancelled = false;
 
-    return () => ctrl.abort();
+    const hydrateFromReport = (r: Report) => {
+      setReport(r);
+      setSections(r.sections);
+      setPanel(r.consumer_panel_forecast ?? null);
+      setBunqSpending(r.bunq_spending_overlay ?? null);
+      setUserSources(r.user_sources ?? []);
+      setGeoOverlays(r.geopolitical_overlays ?? []);
+      // Mark every module as "done" in the pipeline grid since they all
+      // already ran when the cache was populated.
+      setPipeline((prev) => {
+        const next: PipelineState = { ...prev };
+        for (const k of Object.keys(prev)) {
+          next[k] = { ...prev[k], status: "done" as const, elapsedMs: 0 };
+        }
+        return next;
+      });
+      setSynthesizing(false);
+      setPending(false);
+    };
+
+    // Try the cache first — if we have a recent compiled report for this
+    // ticker, hydrate instantly and skip the 25-second pipeline. The
+    // "Re-run" button forces a fresh stream.
+    (async () => {
+      try {
+        const cached = await getCachedReport(ticker);
+        if (cancelled || ctrl.signal.aborted) return;
+        if (cached) {
+          hydrateFromReport(cached.report);
+          setFromCache({
+            generatedAt: cached.generated_at,
+            ageS: cached.age_s,
+          });
+          log(
+            `✦ cached analysis · ${formatAge(cached.age_s)} ago — Re-run to refresh`
+          );
+          return;
+        }
+      } catch (e) {
+        log(`(no cache: ${(e as Error).message}) — running fresh`);
+      }
+      streamAnalyze(ticker, coords, onEvent, ctrl.signal).catch((e) => {
+        if (ctrl.signal.aborted) return;
+        const msg = (e as Error).message;
+        log(`ERROR: ${msg}`);
+        setErr(msg);
+        setPending(false);
+      });
+    })();
+
+    return () => {
+      cancelled = true;
+      ctrl.abort();
+    };
   }, [ticker, coords]);
+
+  async function reanalyze() {
+    if (pending) return;
+    try {
+      await clearCachedReport(ticker);
+    } catch {
+      // ignore
+    }
+    window.location.reload();
+  }
 
   return (
     <main className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-6 py-8">
-      <div className="flex items-center justify-between">
-        <a
-          href="/"
-          className="font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--bunq-faint)] hover:text-[var(--bunq-text)]"
-        >
-          ← back
-        </a>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-3">
+          <a
+            href="/"
+            className="font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--bunq-faint)] hover:text-[var(--bunq-text)]"
+          >
+            ← back
+          </a>
+          {fromCache && (
+            <button
+              onClick={reanalyze}
+              className="rounded-full px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.16em]"
+              style={{
+                background: "var(--bunq-green-soft)",
+                color: "var(--bunq-green)",
+                border: "1px solid rgba(181,255,0,0.30)",
+              }}
+              title="This report was loaded from cache — click to run a fresh analysis"
+            >
+              cached · {formatAge(fromCache.ageS)} ago · Re-run ↻
+            </button>
+          )}
+        </div>
         <div className="flex gap-2">
           <button
             onClick={exportPdf}
@@ -624,6 +707,9 @@ function AnalyzePage() {
         <LiveClipSearch
           ticker={ticker}
           companyName={report.company_name}
+          onIngested={(src) =>
+            setUserSources((prev) => [...prev, src])
+          }
         />
       )}
 

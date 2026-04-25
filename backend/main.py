@@ -48,6 +48,7 @@ from backend.auth import (
 )
 from backend.db import (
     AnalysisRun,
+    CachedReport,
     Investment,
     User,
     UserEvidence,
@@ -175,6 +176,104 @@ def auth_me(user: User = Depends(require_user)) -> dict:
 
 
 # ---- pre-IPO ------------------------------------------------------------
+
+
+@app.post("/evidence/from-url/stream")
+async def evidence_from_url_stream(
+    payload: dict,
+    user: User = Depends(require_user),
+    session: Session = Depends(get_session),
+) -> StreamingResponse:
+    """Ingest a YouTube URL on-demand: download a 30-60s segment, run the full
+    multimodal pipeline (audio extract + Transcribe + frame grid + prosody +
+    Claude vision), append the result as a UserSource for the user's analysis
+    of <ticker>.
+
+    Body:
+        { url: str, ticker: str, company_name?: str,
+          start_s?: int (default 0), duration_s?: int (default 60),
+          user_note?: str, user_tag?: 'supporting'|'contradicting'|'neutral' }
+
+    SSE events:
+        {step, status} per stage (yt_dlp, audio_extract, prosody, frame_grid,
+        transcribe, vision_claude), then {result: UserSource}.
+    """
+    url = (payload.get("url") or "").strip()
+    ticker = (payload.get("ticker") or "").upper().strip()
+    company_name = payload.get("company_name")
+    start_s = int(payload.get("start_s") or 0)
+    duration_s = int(payload.get("duration_s") or 60)
+    user_note = payload.get("user_note") or ""
+    user_tag = payload.get("user_tag") or "neutral"
+    if user_tag not in ("supporting", "contradicting", "neutral"):
+        user_tag = "neutral"
+    if not url or not ticker:
+        raise HTTPException(400, "url and ticker required")
+    if duration_s > 180:
+        duration_s = 180  # cap at 3 min so Transcribe doesn't run forever
+
+    queue: asyncio.Queue[dict] = asyncio.Queue()
+    loop = asyncio.get_event_loop()
+
+    def on_step(name: str, status: str, detail: dict | None = None) -> None:
+        ev: dict = {"step": name, "status": status}
+        if detail:
+            ev["detail"] = detail
+        loop.call_soon_threadsafe(queue.put_nowait, ev)
+
+    def run_pipeline() -> None:
+        try:
+            from backend.scrapers.geopolitical_clips import yt_dlp_segment
+            from backend.analyzers.user_video import analyze_user_video
+            import tempfile
+            from pathlib import Path
+
+            on_step("yt_dlp", "running")
+            with tempfile.TemporaryDirectory(prefix="from-url-") as td:
+                mp4 = Path(td) / "clip.mp4"
+                yt_dlp_segment(url, start_s, duration_s, mp4)
+                mp4_bytes = mp4.read_bytes()
+            on_step("yt_dlp", "done", {"bytes": len(mp4_bytes)})
+
+            src = analyze_user_video(
+                ticker=ticker,
+                company_name=company_name,
+                video_bytes=mp4_bytes,
+                content_type="video/mp4",
+                user_note=user_note or f"Ingested from {url}",
+                user_tag=user_tag,  # type: ignore[arg-type]
+                filename=url[-60:],
+                is_audio_only=False,
+                on_step=on_step,
+            )
+            _persist_user_evidence(session, user, src, ticker, company_name)
+            asyncio.run_coroutine_threadsafe(
+                queue.put({"result": src.model_dump()}), loop
+            )
+        except Exception as e:  # noqa: BLE001
+            log.exception("evidence_from_url_stream failed")
+            asyncio.run_coroutine_threadsafe(queue.put({"error": str(e)}), loop)
+        finally:
+            asyncio.run_coroutine_threadsafe(queue.put({"_done": True}), loop)
+
+    loop.run_in_executor(None, run_pipeline)
+
+    async def event_gen():
+        while True:
+            ev = await queue.get()
+            if ev.get("_done"):
+                return
+            yield f"data: {_json.dumps(ev)}\n\n"
+
+    return StreamingResponse(
+        event_gen(),
+        media_type="text/event-stream",
+        headers={
+            "cache-control": "no-cache",
+            "x-accel-buffering": "no",
+            "connection": "keep-alive",
+        },
+    )
 
 
 @app.get("/geopolitical/search")
@@ -316,10 +415,15 @@ def health() -> dict:
 
 @app.post("/analyze/stream")
 async def analyze_stream_route(
-    req: AnalyzeRequest, user: User = Depends(require_user)
+    req: AnalyzeRequest,
+    user: User = Depends(require_user),
+    session: Session = Depends(get_session),
 ) -> StreamingResponse:
     """SSE stream of pipeline events. Events:
         start, module_start, module_done, synthesizing, report, error
+
+    On the final 'report' event, also persists a CachedReport row so the
+    frontend can re-hydrate this analysis instantly on navigate-back.
     """
     coords = (req.lat, req.lng) if req.lat is not None and req.lng is not None else None
     location_label = _nearest_label(coords) if coords else None
@@ -338,6 +442,13 @@ async def analyze_stream_route(
                 ticker_upper, coords=coords, location_label=location_label
             ):
                 yield f"data: {_json.dumps(ev)}\n\n"
+                # Cache the final report so navigate-back hydrates instantly.
+                if ev.get("event") == "report":
+                    try:
+                        report_obj = Report(**ev["report"])
+                        _persist_cached_report(session, user, report_obj)
+                    except Exception:  # noqa: BLE001
+                        log.exception("failed to cache stream report (non-fatal)")
         except Exception as e:  # noqa: BLE001
             log.exception("analyze_stream failed")
             yield f"data: {_json.dumps({'event': 'error', 'message': str(e)})}\n\n"
@@ -759,6 +870,36 @@ async def evidence(
     return src
 
 
+def _persist_cached_report(session: Session, user: User, report: Report) -> None:
+    """Replace the cached report for (user, ticker). Best-effort — never
+    blocks the user-visible response on persistence."""
+    try:
+        existing = session.exec(
+            select(CachedReport)
+            .where(CachedReport.user_id == user.id)
+            .where(CachedReport.ticker == report.ticker)
+        ).first()
+        payload = report.model_dump_json()
+        now = datetime.now(timezone.utc)
+        if existing is not None:
+            existing.report_json = payload
+            existing.generated_at = now
+            session.add(existing)
+        else:
+            session.add(
+                CachedReport(
+                    user_id=user.id,
+                    ticker=report.ticker,
+                    report_json=payload,
+                    generated_at=now,
+                )
+            )
+        session.commit()
+    except Exception:  # noqa: BLE001
+        log.exception("failed to persist CachedReport (non-fatal)")
+        session.rollback()
+
+
 def _persist_user_evidence(
     session: Session,
     user: User,
@@ -827,7 +968,55 @@ async def analyze(
     except Exception:  # noqa: BLE001
         log.exception("failed to persist AnalysisRun (non-fatal)")
         session.rollback()
+    _persist_cached_report(session, user, report)
     return report
+
+
+@app.get("/me/reports/{ticker}/latest")
+def me_report_latest(
+    ticker: str,
+    user: User = Depends(require_user),
+    session: Session = Depends(get_session),
+) -> dict:
+    """Most recent full Report for (user, ticker). 404 if never analyzed.
+    The frontend uses this to skip the 25-second pipeline on navigate-back."""
+    row = session.exec(
+        select(CachedReport)
+        .where(CachedReport.user_id == user.id)
+        .where(CachedReport.ticker == ticker.upper())
+    ).first()
+    if row is None:
+        raise HTTPException(404, f"no cached report for {ticker}")
+    # SQLite via SQLModel may return a naive datetime — coerce both to UTC
+    # before subtracting.
+    generated = row.generated_at
+    if generated.tzinfo is None:
+        generated = generated.replace(tzinfo=timezone.utc)
+    age_s = (datetime.now(timezone.utc) - generated).total_seconds()
+    return {
+        "ticker": row.ticker,
+        "generated_at": generated.isoformat(),
+        "age_s": age_s,
+        "report": _json.loads(row.report_json),
+    }
+
+
+@app.delete("/me/reports/{ticker}")
+def me_report_clear(
+    ticker: str,
+    user: User = Depends(require_user),
+    session: Session = Depends(get_session),
+) -> dict:
+    """Drop the cached report for (user, ticker) so the next analyze runs fresh."""
+    row = session.exec(
+        select(CachedReport)
+        .where(CachedReport.user_id == user.id)
+        .where(CachedReport.ticker == ticker.upper())
+    ).first()
+    if row is not None:
+        session.delete(row)
+        session.commit()
+    return {"ok": True}
 
 
 def _nearest_label(coords: tuple[float, float] | None) -> str | None:

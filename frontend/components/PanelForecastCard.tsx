@@ -1,3 +1,4 @@
+import { Term } from "@/components/Glossary";
 import { PanelChart } from "@/components/PanelChart";
 import type { ConsumerPanelForecast } from "@/lib/api";
 
@@ -55,20 +56,24 @@ export function PanelForecastCard({
 
         <div className="text-right text-sm">
           <Stat
+            term="yoy"
             label="YoY spend"
             value={`${forecast.yoy_change_pct >= 0 ? "+" : ""}${forecast.yoy_change_pct.toFixed(1)}%`}
             accent={forecast.yoy_change_pct >= 0}
           />
           <Stat
+            term="qoq"
             label="QoQ spend"
             value={`${forecast.qoq_change_pct >= 0 ? "+" : ""}${forecast.qoq_change_pct.toFixed(1)}%`}
             accent={forecast.qoq_change_pct >= 0}
           />
           <Stat
+            term="panel_size"
             label="panel N"
             value={forecast.panel_size_n.toLocaleString()}
           />
           <Stat
+            term="hist_correlation"
             label="hist. corr."
             value={forecast.historical_correlation.toFixed(2)}
           />
@@ -108,14 +113,18 @@ function Stat({
   label,
   value,
   accent,
+  term,
 }: {
   label: string;
   value: string;
   accent?: boolean;
+  term?: string;
 }) {
   return (
     <div className="mt-1 flex items-baseline justify-end gap-2">
-      <span className="text-xs text-[var(--bunq-faint)]">{label}</span>
+      <span className="text-xs text-[var(--bunq-faint)]">
+        {term ? <Term term={term}>{label}</Term> : label}
+      </span>
       <span
         className={`bunq-numeral font-mono font-bold ${
           accent === undefined

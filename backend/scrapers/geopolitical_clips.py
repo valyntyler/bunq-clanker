@@ -94,13 +94,25 @@ def yt_dlp_search(query: str, max_results: int = 10) -> list[dict]:
             d = _json.loads(line)
         except _json.JSONDecodeError:
             continue
+        thumb = d.get("thumbnail")
+        if not thumb:
+            # In flat-playlist mode yt-dlp returns a list of thumbnails with
+            # multiple resolutions instead of a single URL — pick the largest
+            # so the UI cards aren't blurry.
+            thumbs = d.get("thumbnails") or []
+            if thumbs:
+                # Prefer the highest-resolution (last item is usually largest)
+                thumb = thumbs[-1].get("url") if isinstance(thumbs[-1], dict) else None
+        if not thumb and d.get("id"):
+            # Fallback to YouTube's deterministic thumbnail URL — always works
+            thumb = f"https://i.ytimg.com/vi/{d['id']}/hqdefault.jpg"
         out.append(
             {
                 "id": d.get("id"),
                 "title": d.get("title"),
                 "channel": d.get("channel") or d.get("uploader"),
                 "url": d.get("webpage_url") or f"https://www.youtube.com/watch?v={d.get('id')}",
-                "thumbnail": d.get("thumbnail"),
+                "thumbnail": thumb,
                 "duration_s": d.get("duration"),
                 "view_count": d.get("view_count"),
                 "upload_date": d.get("upload_date"),

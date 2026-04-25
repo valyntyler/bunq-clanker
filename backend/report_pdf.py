@@ -18,17 +18,21 @@ from fpdf import FPDF
 
 from backend.models import Report
 
-# ── Bunq palette (RGB tuples) ────────────────────────────────────────────
-BG = (8, 8, 10)
-SURFACE = (17, 18, 26)
-SURFACE_2 = (22, 24, 32)
-TEXT = (245, 247, 250)
-MUTED = (138, 143, 155)
-FAINT = (90, 94, 108)
-GREEN = (181, 255, 0)
-GREEN_DEEP = (108, 184, 0)
-WARN = (255, 183, 77)
-BAD = (255, 91, 107)
+# ── Print-friendly Bunq palette ──────────────────────────────────────────
+# We intentionally use a LIGHT theme for the PDF — black-on-white reads
+# everywhere, prints cheaply, and survives PDF-reader theme inversion. The
+# Bunq lime accent is darkened so it stays legible on white.
+BG = (255, 255, 255)
+TEXT = (16, 18, 22)          # near-black for body
+MUTED = (90, 94, 108)        # mid-gray for secondary
+FAINT = (130, 134, 144)      # for very secondary / labels
+GREEN = (96, 168, 0)         # Bunq lime, darkened for white-bg legibility
+GREEN_BG = (181, 255, 0)     # full lime, only for accent fills
+GREEN_DEEP = (60, 110, 0)
+WARN = (200, 130, 0)         # amber, darkened
+WARN_BG = (255, 200, 100)
+BAD = (200, 50, 70)
+BAD_BG = (255, 220, 220)
 
 
 def _strip_md(s: str) -> str:
@@ -121,10 +125,16 @@ class ReportPDF(FPDF):
 
 
 def _h2(pdf: FPDF, text: str) -> None:
-    pdf.set_text_color(*FAINT)
-    pdf.set_font("Helvetica", "B", 8)
+    pdf.set_text_color(*MUTED)
+    pdf.set_font("Helvetica", "B", 9)
     pdf.cell(0, 5, _safe(text.upper()), new_x="LMARGIN", new_y="NEXT")
-    pdf.ln(1)
+    # accent underline
+    pdf.set_draw_color(*GREEN)
+    pdf.set_line_width(0.4)
+    y = pdf.get_y()
+    pdf.line(15, y, 30, y)
+    pdf.set_line_width(0.2)
+    pdf.ln(2)
 
 
 def _body(pdf: FPDF, text: str, color=TEXT, size: int = 10) -> None:
@@ -134,52 +144,68 @@ def _body(pdf: FPDF, text: str, color=TEXT, size: int = 10) -> None:
 
 
 def _verdict_banner(pdf: ReportPDF, report: Report) -> None:
-    color_map = {"BUY": GREEN, "HOLD": WARN, "AVOID": BAD}
-    bg = color_map.get(report.verdict, MUTED)
+    """Two-column banner — verdict + chips on the left, one-liner under it.
+    Painted as a soft tinted card so it stays legible on white paper."""
+    bg_map = {"BUY": GREEN_BG, "HOLD": WARN_BG, "AVOID": BAD_BG}
+    accent_map = {"BUY": GREEN_DEEP, "HOLD": (140, 90, 0), "AVOID": BAD}
+    bg = bg_map.get(report.verdict, (240, 240, 244))
+    accent = accent_map.get(report.verdict, MUTED)
+
+    y0 = pdf.get_y()
+    banner_h = 42
     pdf.set_fill_color(*bg)
-    pdf.rect(15, pdf.get_y(), 180, 38, "F")
-    pdf.set_text_color(10, 13, 5)
+    pdf.rect(15, y0, 180, banner_h, "F")
+    # subtle bottom border
+    pdf.set_draw_color(*accent)
+    pdf.set_line_width(0.5)
+    pdf.line(15, y0 + banner_h, 195, y0 + banner_h)
+    pdf.set_line_width(0.2)
 
-    pdf.set_xy(20, pdf.get_y() + 4)
+    # Company / ticker label
+    pdf.set_text_color(*TEXT)
+    pdf.set_xy(20, y0 + 4)
     pdf.set_font("Helvetica", "", 8)
-    pdf.cell(
-        0,
-        4,
-        _safe(f"{report.company_name}  -  {report.ticker}"),
-        new_x="LMARGIN",
-        new_y="NEXT",
-    )
+    pdf.cell(170, 4, _safe(f"{report.company_name}  -  {report.ticker}"))
 
-    pdf.set_x(20)
+    # Verdict word, big
+    pdf.set_xy(20, y0 + 9)
+    pdf.set_text_color(*TEXT)
     pdf.set_font("Helvetica", "B", 28)
-    pdf.cell(60, 14, _safe(report.verdict), new_x="LEFT", new_y="TOP")
+    pdf.cell(70, 14, _safe(report.verdict))
 
-    pdf.set_xy(85, pdf.get_y() + 1)
-    pdf.set_font("Helvetica", "", 10)
-    pdf.multi_cell(105, 5, _safe(report.one_liner), wrapmode="CHAR", new_x="LMARGIN", new_y="NEXT")
-
-    pdf.set_xy(150, pdf.get_y() - 14)
-    pdf.set_font("Helvetica", "B", 10)
+    # Chips on the right of the verdict word
+    pdf.set_xy(95, y0 + 12)
+    pdf.set_text_color(*MUTED)
+    pdf.set_font("Helvetica", "B", 9)
     pdf.cell(
-        45,
+        100,
         5,
         _safe(
-            f"conf {int(report.confidence * 100)}%  ·  size {report.position_size_pct:.1f}%"
+            f"conf {int(report.confidence * 100)}%   ·   size {report.position_size_pct:.1f}%"
         ),
-        align="R",
     )
     if report.consumer_panel_forecast:
         nq = report.consumer_panel_forecast.next_quarter
-        pdf.set_xy(150, pdf.get_y() + 5)
-        pdf.cell(
-            45,
-            5,
-            _safe(f"Q+1 {nq.revenue_direction}  {nq.vs_consensus_pct}"),
-            align="R",
-        )
+        pdf.set_xy(95, y0 + 18)
+        pdf.cell(100, 5, _safe(f"Q+1 {nq.revenue_direction}  {nq.vs_consensus_pct}"))
 
-    pdf.set_y(pdf.get_y() + 12)
-    pdf.ln(4)
+    # One-liner (multi-line) at the bottom of the banner — full width
+    pdf.set_xy(20, y0 + 26)
+    pdf.set_text_color(*TEXT)
+    pdf.set_font("Helvetica", "", 9)
+    pdf.set_left_margin(20)
+    pdf.multi_cell(
+        170,
+        4,
+        _safe(report.one_liner),
+        wrapmode="WORD",
+        new_x="LMARGIN",
+        new_y="NEXT",
+    )
+    pdf.set_left_margin(15)
+
+    # Move below the banner regardless of where the one-liner ended.
+    pdf.set_y(y0 + banner_h + 6)
 
 
 def _panel(pdf: ReportPDF, report: Report) -> None:
