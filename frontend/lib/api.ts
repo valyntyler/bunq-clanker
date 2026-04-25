@@ -3,6 +3,30 @@
 export const BACKEND_URL =
   process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:8080";
 
+// ---- auth header injection ----------------------------------------------
+// Read token directly from localStorage rather than importing from auth.ts
+// — keeps lib/api.ts safe to use during SSR (where window is undefined).
+const TOKEN_KEY = "sauron.token";
+
+function authHeader(): Record<string, string> {
+  if (typeof window === "undefined") return {};
+  const t = window.localStorage.getItem(TOKEN_KEY);
+  return t ? { authorization: `Bearer ${t}` } : {};
+}
+
+/** Bunq fetch wrapper: adds Authorization on every call, handles 401 by
+ * dropping the token (so the AuthGuard re-renders to /login). */
+async function authFetch(url: string, init: RequestInit = {}): Promise<Response> {
+  const headers = new Headers(init.headers);
+  for (const [k, v] of Object.entries(authHeader())) headers.set(k, v);
+  const r = await fetch(url, { ...init, headers });
+  if (r.status === 401 && typeof window !== "undefined") {
+    window.localStorage.removeItem(TOKEN_KEY);
+    window.dispatchEvent(new Event("sauron-auth"));
+  }
+  return r;
+}
+
 export type Verdict = "BUY" | "HOLD" | "AVOID";
 export type Direction = "beat" | "in-line" | "miss";
 export type Trend = "accelerating" | "flat" | "declining";
@@ -122,7 +146,7 @@ export async function analyze(
   coords?: { lat: number; lng: number }
 ): Promise<Report> {
   return j<Report>(
-    await fetch(`${BACKEND_URL}/analyze`, {
+    await authFetch(`${BACKEND_URL}/analyze`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ ticker, lat: coords?.lat, lng: coords?.lng }),
@@ -136,7 +160,7 @@ export async function nearbyTickers(
   radiusM = 5000
 ): Promise<NearbyTicker[]> {
   return j<NearbyTicker[]>(
-    await fetch(
+    await authFetch(
       `${BACKEND_URL}/nearby-tickers?lat=${lat}&lng=${lng}&radius_m=${radiusM}`
     )
   );
@@ -152,7 +176,7 @@ export async function validateTicker(
   ticker: string
 ): Promise<ValidateTickerResponse> {
   return j<ValidateTickerResponse>(
-    await fetch(
+    await authFetch(
       `${BACKEND_URL}/validate-ticker/${encodeURIComponent(ticker)}`
     )
   );
@@ -163,7 +187,7 @@ export async function invest(
   amountEur: number
 ): Promise<InvestReceipt> {
   return j<InvestReceipt>(
-    await fetch(`${BACKEND_URL}/invest`, {
+    await authFetch(`${BACKEND_URL}/invest`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ ticker, amount_eur: amountEur }),
@@ -177,7 +201,7 @@ export interface BunqBalance {
 }
 
 export async function bunqBalance(): Promise<BunqBalance> {
-  return j<BunqBalance>(await fetch(`${BACKEND_URL}/balance`));
+  return j<BunqBalance>(await authFetch(`${BACKEND_URL}/balance`));
 }
 
 export type EvidenceTag = "supporting" | "contradicting" | "neutral";
@@ -196,7 +220,7 @@ export async function submitEvidence(
   req: EvidenceRequest
 ): Promise<UserSource> {
   return j<UserSource>(
-    await fetch(`${BACKEND_URL}/evidence`, {
+    await authFetch(`${BACKEND_URL}/evidence`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(req),
@@ -222,7 +246,7 @@ export async function uploadEvidence(args: {
   fd.set("user_tag", args.userTag ?? "neutral");
   fd.set("file", args.file);
   return j<UserSource>(
-    await fetch(`${BACKEND_URL}/evidence/upload`, {
+    await authFetch(`${BACKEND_URL}/evidence/upload`, {
       method: "POST",
       body: fd,
     })
@@ -244,7 +268,7 @@ export async function resynthesize(
   req: ResynthesizeRequest
 ): Promise<Report> {
   return j<Report>(
-    await fetch(`${BACKEND_URL}/resynthesize`, {
+    await authFetch(`${BACKEND_URL}/resynthesize`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(req),
@@ -266,7 +290,7 @@ export async function chatStream(args: {
   onToken: (s: string) => void;
   signal?: AbortSignal;
 }): Promise<void> {
-  const r = await fetch(`${BACKEND_URL}/chat/stream`, {
+  const r = await authFetch(`${BACKEND_URL}/chat/stream`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
@@ -328,7 +352,7 @@ export async function streamAnalyze(
   onEvent: (ev: AnalyzeEvent) => void,
   signal?: AbortSignal
 ): Promise<void> {
-  const r = await fetch(`${BACKEND_URL}/analyze/stream`, {
+  const r = await authFetch(`${BACKEND_URL}/analyze/stream`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ ticker, lat: coords?.lat, lng: coords?.lng }),

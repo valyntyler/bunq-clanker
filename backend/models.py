@@ -151,6 +151,21 @@ class ResynthesizeRequest(BaseModel):
     location_context: LocationContext = LocationContext()
 
 
+class RegisterRequest(BaseModel):
+    email: str
+    password: str
+
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+
+class AuthResponse(BaseModel):
+    token: str
+    user: dict
+
+
 class ChatTurn(BaseModel):
     role: Literal["user", "assistant"]
     content: str

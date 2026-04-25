@@ -36,6 +36,7 @@ yarn-error.log*
 *.db-journal
 *.sqlite
 *.sqlite3
+backend/db/
 clips/*.mp4
 clips/*.wav
 clips/*.m4a

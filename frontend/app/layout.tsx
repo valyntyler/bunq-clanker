@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { TopBar } from "@/components/TopBar";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -32,6 +33,7 @@ export default function RootLayout({
         className="flex min-h-full flex-col"
         style={{ background: "var(--bunq-bg)", color: "var(--bunq-text)" }}
       >
+        <TopBar />
         {children}
       </body>
     </html>

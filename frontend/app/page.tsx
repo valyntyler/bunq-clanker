@@ -2,10 +2,19 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { AuthGuard } from "@/components/AuthGuard";
 import { NearbyTickersPicker } from "@/components/NearbyTickers";
 import { validateTicker } from "@/lib/api";
 
-export default function Landing() {
+export default function LandingPage() {
+  return (
+    <AuthGuard>
+      <Landing />
+    </AuthGuard>
+  );
+}
+
+function Landing() {
   const router = useRouter();
   const [typed, setTyped] = useState("");
   const [checking, setChecking] = useState(false);

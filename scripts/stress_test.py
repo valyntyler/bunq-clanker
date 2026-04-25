@@ -24,6 +24,9 @@ BACKEND = "http://127.0.0.1:8080"
 PASSED: list[str] = []
 FAILED: list[str] = []
 
+# A token, minted at startup against the live backend, used for authed probes.
+AUTH_TOKEN: str = ""
+
 
 @dataclass
 class Probe:
@@ -36,12 +39,18 @@ class Probe:
     expect_truthy: list[str] | None = None      # all must be truthy
     expect_falsy: list[str] | None = None       # all must be falsy / None / []
     timeout: float = 90.0
+    auth: bool = True  # default — every gated endpoint passes the bearer token
 
 
 def run(p: Probe) -> None:
     label = f"  [{p.method:5s}] {p.path[:60]:60s} {p.name}"
+    headers = {}
+    if p.auth and AUTH_TOKEN:
+        headers["authorization"] = f"Bearer {AUTH_TOKEN}"
     try:
-        r = httpx.request(p.method, BACKEND + p.path, json=p.body, timeout=p.timeout)
+        r = httpx.request(
+            p.method, BACKEND + p.path, json=p.body, headers=headers, timeout=p.timeout
+        )
     except Exception as e:  # noqa: BLE001
         FAILED.append(f"{label} ✗ network error: {e}")
         print(FAILED[-1])
@@ -112,48 +121,87 @@ def _dig(d, dotted: str, sentinel=None):
 # --------------------------------------------------------------------
 
 PROBES: list[Probe] = [
-    # ----- /health -----
+    # ----- /health (PUBLIC) -----
     Probe(
         name="health endpoint",
         method="GET", path="/health",
         expect_keys=["status", "llm_provider", "bedrock_model"],
+        auth=False,
+    ),
+
+    # ----- auth gating -----
+    Probe(
+        name="balance without token → 401",
+        method="GET", path="/balance",
+        expect_status=401,
+        auth=False,
+    ),
+    Probe(
+        name="analyze without token → 401",
+        method="POST", path="/analyze",
+        body={"ticker": "AAPL"},
+        expect_status=401,
+        auth=False,
+    ),
+    Probe(
+        name="chat without token → 401",
+        method="POST", path="/chat",
+        body={
+            "ticker": "AAPL",
+            "message": "hi",
+            "history": [],
+            "report": {
+                "ticker": "AAPL", "company_name": "x", "generated_at": "x",
+                "verdict": "HOLD", "confidence": 0.5, "position_size_pct": 0,
+                "one_liner": "x", "sections": {}, "disclaimer": "x",
+            },
+        },
+        expect_status=401,
+        auth=False,
     ),
 
     # ----- /validate-ticker -----
     Probe(
-        name="validate real common (AAPL)",
+        name="validate real common (AAPL) — public",
         method="GET", path="/validate-ticker/AAPL",
         expect_truthy=["ok"], expect_keys=["name"],
+        auth=False,
     ),
     Probe(
-        name="validate real EU (HEIA.AS)",
+        name="validate real EU (HEIA.AS) — public",
         method="GET", path="/validate-ticker/HEIA.AS",
         expect_truthy=["ok", "name"],
+        auth=False,
     ),
     Probe(
-        name="validate real but exotic (BRK-B)",
+        name="validate real but exotic (BRK-B) — public",
         method="GET", path="/validate-ticker/BRK-B",
         expect_truthy=["ok"],
+        auth=False,
     ),
     Probe(
-        name="validate real obscure no fixtures (F)",
+        name="validate real obscure no fixtures (F) — public",
         method="GET", path="/validate-ticker/F",
         expect_truthy=["ok"],
+        auth=False,
     ),
     Probe(
         name="validate bogus letters (XYZZY)",
         method="GET", path="/validate-ticker/XYZZY",
         expect_falsy=["ok"],
+        auth=False,
     ),
     Probe(
         name="validate bogus numbers (12345)",
         method="GET", path="/validate-ticker/12345",
         expect_falsy=["ok"],
+        auth=False,
     ),
     Probe(
         name="validate bogus punctuation",
         method="GET", path="/validate-ticker/$$$$",
         expect_falsy=["ok"],
+        auth=False,
     ),
 
     # ----- /nearby-tickers -----
@@ -300,12 +348,13 @@ PROBES: list[Probe] = [
 def stream_probes() -> None:
     """SSE stream probes — printed inline since they don't fit the dataclass."""
     label = lambda name: f"  [POST ] /analyze/stream {name:>40s}"
+    headers = {"authorization": f"Bearer {AUTH_TOKEN}"} if AUTH_TOKEN else {}
 
     # Bogus ticker should yield ONE error event
     try:
         with httpx.stream(
             "POST", BACKEND + "/analyze/stream",
-            json={"ticker": "XYZZY"}, timeout=30,
+            json={"ticker": "XYZZY"}, timeout=30, headers=headers,
         ) as r:
             events = []
             for line in r.iter_lines():
@@ -327,7 +376,7 @@ def stream_probes() -> None:
     try:
         with httpx.stream(
             "POST", BACKEND + "/analyze/stream",
-            json={"ticker": "AAPL"}, timeout=120,
+            json={"ticker": "AAPL"}, timeout=120, headers=headers,
         ) as r:
             events = []
             for line in r.iter_lines():
@@ -355,8 +404,32 @@ def stream_probes() -> None:
         print(FAILED[-1])
 
 
+def _bootstrap_token() -> str:
+    """Get an auth token by registering a fresh test user (or logging in)."""
+    test_email = "stress-test@sauron.local"
+    test_pwd = "stress-pass-12345678"
+    r = httpx.post(
+        BACKEND + "/auth/login",
+        json={"email": test_email, "password": test_pwd},
+        timeout=10,
+    )
+    if r.status_code == 200:
+        return r.json()["token"]
+    r = httpx.post(
+        BACKEND + "/auth/register",
+        json={"email": test_email, "password": test_pwd},
+        timeout=10,
+    )
+    r.raise_for_status()
+    return r.json()["token"]
+
+
 def main() -> None:
-    print(f"Stress-testing {BACKEND} ({len(PROBES)} probes + 2 stream probes)\n")
+    global AUTH_TOKEN
+    print(f"Stress-testing {BACKEND}")
+    AUTH_TOKEN = _bootstrap_token()
+    print(f"  auth token: {AUTH_TOKEN[:24]}…")
+    print(f"  {len(PROBES)} probes + 2 stream probes\n")
     t0 = time.monotonic()
     for p in PROBES:
         run(p)

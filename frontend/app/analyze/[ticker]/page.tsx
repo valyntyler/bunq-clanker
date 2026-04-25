@@ -14,6 +14,7 @@ import {
   type UserSource,
 } from "@/lib/api";
 import { AddEvidenceModal } from "@/components/AddEvidenceModal";
+import { AuthGuard } from "@/components/AuthGuard";
 import { ChatPanel } from "@/components/ChatPanel";
 import { VerdictBanner } from "@/components/VerdictBanner";
 import { SectionCard } from "@/components/SectionCard";
@@ -51,7 +52,15 @@ const MODULE_DISPLAY: Record<string, string> = {
   bunq_spending: "bunq_spending",
 };
 
-export default function AnalyzePage() {
+export default function AnalyzePageWrapper() {
+  return (
+    <AuthGuard>
+      <AnalyzePage />
+    </AuthGuard>
+  );
+}
+
+function AnalyzePage() {
   const params = useParams<{ ticker: string }>();
   const search = useSearchParams();
   const ticker = decodeURIComponent(params.ticker).toUpperCase();

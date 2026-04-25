@@ -38,19 +38,32 @@ from backend.integrations import alpaca as alpaca_i
 from backend.integrations import bunq as bunq_i
 from backend.analyzers.chat import chat_once, chat_stream
 from backend.analyzers.synthesizer import synthesize
+from backend.auth import (
+    create_token,
+    decode_token,
+    hash_password,
+    require_user,
+    verify_password,
+)
+from backend.db import User, get_session, init_db
 from backend.models import (
     AnalyzeRequest,
+    AuthResponse,
     ChatRequest,
     ChatResponse,
     ConsumerPanelForecast,
     EvidenceRequest,
     InvestReceipt,
     InvestRequest,
+    LoginRequest,
     NearbyTicker,
+    RegisterRequest,
     Report,
     ResynthesizeRequest,
     UserSource,
 )
+from sqlmodel import Session, select
+from fastapi import Depends
 from backend.orchestrator import analyze_async, analyze_stream
 from backend.scrapers.compress import compress_audio, compress_image, compress_video
 from backend.scrapers.user_evidence import fetch_url, passthrough_text
@@ -60,6 +73,11 @@ logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("prospectus")
 
 app = FastAPI(title="Prospectus / Sauron Wallet", version="0.0.1")
+
+
+@app.on_event("startup")
+def _startup() -> None:
+    init_db()
 
 # frontend is served from a different port in dev — allow localhost origins
 app.add_middleware(
@@ -94,6 +112,58 @@ def _haversine_m(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
     return 2 * R * math.asin(math.sqrt(a))
 
 
+# ---- auth -------------------------------------------------------------
+
+EMAIL_RE = __import__("re").compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+
+@app.post("/auth/register", response_model=AuthResponse)
+def auth_register(req: RegisterRequest, session: Session = Depends(get_session)) -> AuthResponse:
+    email = req.email.strip().lower()
+    if not EMAIL_RE.match(email):
+        raise HTTPException(400, "invalid email")
+    if len(req.password) < 8:
+        raise HTTPException(400, "password must be at least 8 characters")
+    existing = session.exec(select(User).where(User.email == email)).first()
+    if existing:
+        raise HTTPException(409, "an account with that email already exists")
+    user = User(email=email, password_hash=hash_password(req.password))
+    session.add(user)
+    session.commit()
+    session.refresh(user)
+    token = create_token(user.id)
+    return AuthResponse(
+        token=token,
+        user={"id": user.id, "email": user.email, "created_at": user.created_at.isoformat()},
+    )
+
+
+@app.post("/auth/login", response_model=AuthResponse)
+def auth_login(req: LoginRequest, session: Session = Depends(get_session)) -> AuthResponse:
+    email = req.email.strip().lower()
+    user = session.exec(select(User).where(User.email == email)).first()
+    if user is None or not verify_password(req.password, user.password_hash):
+        # Keep the message generic — don't leak which side was wrong
+        raise HTTPException(401, "invalid credentials")
+    token = create_token(user.id)
+    return AuthResponse(
+        token=token,
+        user={"id": user.id, "email": user.email, "created_at": user.created_at.isoformat()},
+    )
+
+
+@app.get("/auth/me")
+def auth_me(user: User = Depends(require_user)) -> dict:
+    return {
+        "id": user.id,
+        "email": user.email,
+        "created_at": user.created_at.isoformat(),
+    }
+
+
+# ---- public endpoints (intentionally unauthenticated) ----------------
+
+
 @app.get("/health")
 def health() -> dict:
     return {
@@ -106,7 +176,9 @@ def health() -> dict:
 
 
 @app.post("/analyze/stream")
-async def analyze_stream_route(req: AnalyzeRequest) -> StreamingResponse:
+async def analyze_stream_route(
+    req: AnalyzeRequest, user: User = Depends(require_user)
+) -> StreamingResponse:
     """SSE stream of pipeline events. Events:
         start, module_start, module_done, synthesizing, report, error
     """
@@ -143,7 +215,7 @@ async def analyze_stream_route(req: AnalyzeRequest) -> StreamingResponse:
 
 
 @app.post("/chat", response_model=ChatResponse)
-async def chat(req: ChatRequest) -> ChatResponse:
+async def chat(req: ChatRequest, user: User = Depends(require_user)) -> ChatResponse:
     """Single-shot chat about an existing report."""
     if not req.message.strip():
         raise HTTPException(400, "empty message")
@@ -152,7 +224,9 @@ async def chat(req: ChatRequest) -> ChatResponse:
 
 
 @app.post("/chat/stream")
-async def chat_stream_route(req: ChatRequest) -> StreamingResponse:
+async def chat_stream_route(
+    req: ChatRequest, user: User = Depends(require_user)
+) -> StreamingResponse:
     """SSE-streamed chat — emits {token: '...'} per content delta."""
     if not req.message.strip():
         raise HTTPException(400, "empty message")
@@ -206,7 +280,9 @@ async def chat_stream_route(req: ChatRequest) -> StreamingResponse:
 
 
 @app.post("/resynthesize", response_model=Report)
-async def resynthesize(req: ResynthesizeRequest) -> Report:
+async def resynthesize(
+    req: ResynthesizeRequest, user: User = Depends(require_user)
+) -> Report:
     """Re-run the synthesizer with the original modules + new user_sources.
     Returns a fresh Report with updated verdict/confidence/one_liner/conflicts.
     Skips all the expensive scraping; only the synthesizer Claude call fires.
@@ -259,6 +335,7 @@ async def evidence_upload(
     user_tag: str = Form("neutral"),
     company_name: str | None = Form(None),
     file: UploadFile = File(...),
+    user: User = Depends(require_user),
 ) -> UserSource:
     """Multipart upload for image / video / audio / pdf evidence."""
     if source_type not in MAX_UPLOAD_BYTES:
@@ -346,7 +423,9 @@ async def evidence_upload(
 
 
 @app.post("/evidence", response_model=UserSource)
-async def evidence(req: EvidenceRequest) -> UserSource:
+async def evidence(
+    req: EvidenceRequest, user: User = Depends(require_user)
+) -> UserSource:
     """Ingest a user-provided URL or text and return an analyzed UserSource."""
     if req.source_type == "url":
         if not req.url:
@@ -385,7 +464,7 @@ async def evidence(req: EvidenceRequest) -> UserSource:
 
 
 @app.post("/analyze", response_model=Report)
-async def analyze(req: AnalyzeRequest) -> Report:
+async def analyze(req: AnalyzeRequest, user: User = Depends(require_user)) -> Report:
     """Full pipeline: fundamentals + news + chart-vision + consumer_panel in
     parallel, then synthesized by Claude into a final verdict.
     """
@@ -420,7 +499,12 @@ def _nearest_label(coords: tuple[float, float] | None) -> str | None:
 
 
 @app.get("/nearby-tickers", response_model=list[NearbyTicker])
-def nearby_tickers(lat: float, lng: float, radius_m: float = 5000) -> list[NearbyTicker]:
+def nearby_tickers(
+    lat: float,
+    lng: float,
+    radius_m: float = 5000,
+    user: User = Depends(require_user),
+) -> list[NearbyTicker]:
     results: list[NearbyTicker] = []
     for row in _load_hq_registry():
         d = _haversine_m(lat, lng, row["lat"], row["lng"])
@@ -440,7 +524,9 @@ def nearby_tickers(lat: float, lng: float, radius_m: float = 5000) -> list[Nearb
 
 
 @app.get("/panel/{ticker}", response_model=ConsumerPanelForecast)
-def panel(ticker: str) -> ConsumerPanelForecast:
+def panel(
+    ticker: str, user: User = Depends(require_user)
+) -> ConsumerPanelForecast:
     try:
         return analyze_consumer_panel(ticker.upper())
     except KeyError:
@@ -460,7 +546,7 @@ FX_EUR_USD = 1.08  # stub rate — we don't need a live FX feed for a paper-trad
 
 
 @app.get("/balance")
-def balance() -> dict:
+def balance(user: User = Depends(require_user)) -> dict:
     """Live Bunq sandbox balances (main + pot). Powers the Invest modal."""
     try:
         return bunq_i.get_balance()
@@ -470,7 +556,7 @@ def balance() -> dict:
 
 
 @app.post("/invest", response_model=InvestReceipt)
-def invest(req: InvestRequest) -> InvestReceipt:
+def invest(req: InvestRequest, user: User = Depends(require_user)) -> InvestReceipt:
     """1) Top-up Bunq Main from sugardaddy if needed.
        2) Transfer EUR Main → Prospectus Investments pot.
        3) Submit an Alpaca paper market-buy at the mapped US-ADR symbol.
