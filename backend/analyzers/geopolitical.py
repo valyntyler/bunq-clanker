@@ -127,6 +127,7 @@ Return STRICT JSON: {{"overlays": [
                     event_id=ev.event_id,
                     speaker=ev.speaker,
                     clip_url=None,
+                    source_url=ev.source_url,
                     relevance=float(item["relevance"]),
                     impact_direction=int(item["impact_direction"]),
                     impact_magnitude=float(item["impact_magnitude"]),

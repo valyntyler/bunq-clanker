@@ -70,6 +70,7 @@ export interface GeopoliticalOverlay {
   event_id: string;
   speaker: string;
   clip_url?: string | null;
+  source_url?: string | null;
   relevance: number;
   impact_direction: number;
   impact_magnitude: number;
@@ -509,6 +510,40 @@ export async function getIpo(
   return j(
     await authFetch(`${BACKEND_URL}/ipos/${encodeURIComponent(slug)}`)
   );
+}
+
+// ---- live YouTube search for geopolitical clips ------------------------
+
+export interface YouTubeSearchResult {
+  id: string;
+  title: string;
+  channel: string;
+  url: string;
+  thumbnail: string | null;
+  duration_s: number | null;
+  view_count: number | null;
+  upload_date: string | null;
+}
+
+export async function searchClips(
+  query: string,
+  maxResults = 10
+): Promise<{ query: string; results: YouTubeSearchResult[] }> {
+  return j(
+    await authFetch(
+      `${BACKEND_URL}/geopolitical/search?q=${encodeURIComponent(query)}&max_results=${maxResults}`
+    )
+  );
+}
+
+export async function downloadReportPdf(report: Report): Promise<Blob> {
+  const r = await authFetch(`${BACKEND_URL}/report/pdf`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(report),
+  });
+  if (!r.ok) throw new Error(`pdf failed: ${r.status} ${r.statusText}`);
+  return r.blob();
 }
 
 export async function resynthesize(

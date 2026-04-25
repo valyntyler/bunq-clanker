@@ -170,6 +170,22 @@ export function GeopoliticalPreview({
         </div>
       )}
 
+      {overlay.source_url && (
+        <a
+          href={overlay.source_url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-3 inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold"
+          style={{
+            background: "var(--bunq-surface-2)",
+            border: "1px solid var(--bunq-border-strong)",
+            color: "var(--bunq-text)",
+          }}
+        >
+          Open source ↗
+        </a>
+      )}
+
       {(overlay.tone_notes || overlay.visual_notes) && (
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
           {overlay.tone_notes && (

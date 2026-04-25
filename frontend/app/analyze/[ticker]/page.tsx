@@ -3,6 +3,7 @@
 import { useParams, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  downloadReportPdf,
   resynthesize,
   streamAnalyze,
   type AnalyzeEvent,
@@ -16,6 +17,7 @@ import {
 import { AddEvidenceModal } from "@/components/AddEvidenceModal";
 import { AuthGuard } from "@/components/AuthGuard";
 import { ChatPanel } from "@/components/ChatPanel";
+import { LiveClipSearch } from "@/components/LiveClipSearch";
 import { Markdown } from "@/components/Markdown";
 import {
   emptyPipelineState,
@@ -99,6 +101,31 @@ function AnalyzePage() {
   const [previewSource, setPreviewSource] = useState<UserSource | null>(null);
   const [previewOverlay, setPreviewOverlay] =
     useState<GeopoliticalOverlay | null>(null);
+  const [exportingPdf, setExportingPdf] = useState(false);
+
+  async function exportPdf() {
+    if (!report || exportingPdf) return;
+    setExportingPdf(true);
+    try {
+      const blob = await downloadReportPdf(report);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const ts = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 16);
+      a.download = `sauron-${report.ticker.replace(/\./g, "_")}-${ts}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      setLines((prev) => [
+        ...prev,
+        `[${ts()}] PDF export failed: ${(e as Error).message}`,
+      ]);
+    } finally {
+      setExportingPdf(false);
+    }
+  }
   const startedAt = useRef<number>(0);
 
   useEffect(() => {
@@ -270,6 +297,19 @@ function AnalyzePage() {
           ← back
         </a>
         <div className="flex gap-2">
+          <button
+            onClick={exportPdf}
+            disabled={!report || exportingPdf}
+            className="rounded-full px-4 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-40"
+            style={{
+              background: "var(--bunq-surface)",
+              border: "1px solid var(--bunq-border-strong)",
+              color: "var(--bunq-text)",
+            }}
+            title="Download a PDF of this report"
+          >
+            {exportingPdf ? "Generating…" : "Export PDF ⬇"}
+          </button>
           <button
             onClick={() => setEvidenceOpen(true)}
             disabled={pending || resynthing || !report}
@@ -543,6 +583,17 @@ function AnalyzePage() {
                       text={g.reasoning}
                       className="mt-2 text-sm text-[var(--bunq-text)]/90"
                     />
+                    {g.source_url && (
+                      <a
+                        href={g.source_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-2 inline-flex items-center gap-1 font-mono text-[10px] underline decoration-dotted"
+                        style={{ color: "var(--bunq-green)" }}
+                      >
+                        source ↗
+                      </a>
+                    )}
                     {g.transcript_excerpt && (
                       <blockquote
                         className="mt-2 border-l-2 pl-3 text-xs italic text-[var(--bunq-muted)]"
@@ -567,6 +618,13 @@ function AnalyzePage() {
             ))}
           </div>
         </section>
+      )}
+
+      {report && (
+        <LiveClipSearch
+          ticker={ticker}
+          companyName={report.company_name}
+        />
       )}
 
       {report && report.conflicts.length > 0 && (

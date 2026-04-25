@@ -50,6 +50,65 @@ class ProcessedClip:
     audio_url: str  # presigned
 
 
+def _yt_dlp_bin() -> str:
+    """Locate yt-dlp on the running process's PATH or in the active venv."""
+    found = shutil.which("yt-dlp")
+    if found:
+        return found
+    import sys
+
+    venv_bin = Path(sys.executable).parent / "yt-dlp"
+    if venv_bin.exists():
+        return str(venv_bin)
+    raise RuntimeError(
+        "yt-dlp not found on PATH or in the venv — install with `pip install yt-dlp`"
+    )
+
+
+def yt_dlp_search(query: str, max_results: int = 10) -> list[dict]:
+    """Search YouTube via yt-dlp without downloading. Returns metadata only.
+
+    Each result: {id, title, channel, url, thumbnail, upload_date, duration_s,
+                  view_count}
+    """
+    import json as _json
+
+    cmd = [
+        _yt_dlp_bin(),
+        "--no-playlist",
+        "--flat-playlist",
+        "--quiet",
+        "--dump-json",
+        "--default-search", "ytsearch",
+        f"ytsearch{max_results}:{query}",
+    ]
+    res = subprocess.run(cmd, capture_output=True, text=True, timeout=20)
+    if res.returncode != 0:
+        raise RuntimeError(f"yt-dlp search failed: {res.stderr or res.stdout}")
+    out: list[dict] = []
+    for line in res.stdout.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            d = _json.loads(line)
+        except _json.JSONDecodeError:
+            continue
+        out.append(
+            {
+                "id": d.get("id"),
+                "title": d.get("title"),
+                "channel": d.get("channel") or d.get("uploader"),
+                "url": d.get("webpage_url") or f"https://www.youtube.com/watch?v={d.get('id')}",
+                "thumbnail": d.get("thumbnail"),
+                "duration_s": d.get("duration"),
+                "view_count": d.get("view_count"),
+                "upload_date": d.get("upload_date"),
+            }
+        )
+    return out
+
+
 def yt_dlp_segment(url: str, start_s: int, duration_s: int, out_mp4: Path) -> None:
     """Download a precise segment with yt-dlp + ffmpeg post-processor."""
     out_mp4.parent.mkdir(parents=True, exist_ok=True)

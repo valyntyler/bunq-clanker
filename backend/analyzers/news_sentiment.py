@@ -34,13 +34,35 @@ def analyze_news(symbol: str, company_name: str | None = None) -> Section:
 
 {headlines}
 
+Each headline is prefixed by an [N] index — use that to reference items.
+
 Return STRICT JSON with keys:
   score: number -1..+1 (overall sentiment)
   summary: string (one sentence summarizing the current news narrative)
   material_events: string[] (max 5, each a terse event with date if known)
-  top_stories: {{"title": string, "source": string, "why_it_matters": string}}[] (max 3)
+  top_stories: {{
+    "ref_index": number (the [N] index from the headline list),
+    "why_it_matters": string
+  }}[] (max 3)
 """
     out = call_claude_json(user, system=SYSTEM, max_tokens=800)
+
+    # Resolve ref_index → real {title, source, url, why_it_matters}
+    top_stories = []
+    for s in out.get("top_stories", [])[:3]:
+        idx = s.get("ref_index")
+        if isinstance(idx, int) and 1 <= idx <= len(items):
+            it = items[idx - 1]
+            top_stories.append(
+                {
+                    "title": it.title,
+                    "source": it.source,
+                    "url": it.url,
+                    "published": it.published,
+                    "why_it_matters": s.get("why_it_matters", ""),
+                }
+            )
+
     return Section(
         score=float(out["score"]),
         summary=out["summary"],
@@ -48,6 +70,6 @@ Return STRICT JSON with keys:
         extra={
             "news_count": len(items),
             "material_events": out.get("material_events", []),
-            "top_stories": out.get("top_stories", []),
+            "top_stories": top_stories,
         },
     )

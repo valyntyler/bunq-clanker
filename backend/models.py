@@ -24,6 +24,7 @@ class GeopoliticalOverlay(BaseModel):
     event_id: str
     speaker: str
     clip_url: str | None = None
+    source_url: str | None = None  # external article / video URL
     relevance: float = Field(ge=0, le=1)
     impact_direction: int = Field(ge=-1, le=1)
     impact_magnitude: float = Field(ge=0, le=1)

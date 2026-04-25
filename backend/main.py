@@ -74,6 +74,7 @@ from backend.models import (
 )
 from fastapi import Depends
 from backend.orchestrator import analyze_async, analyze_stream
+from backend.report_pdf import render_report_pdf
 from backend.scrapers.compress import compress_audio, compress_image, compress_video
 from backend.scrapers.user_evidence import fetch_url, passthrough_text
 from backend.scrapers.yahoo import fetch_ohlcv, validate_ticker
@@ -174,6 +175,29 @@ def auth_me(user: User = Depends(require_user)) -> dict:
 
 
 # ---- pre-IPO ------------------------------------------------------------
+
+
+@app.get("/geopolitical/search")
+async def geopolitical_search(
+    q: str,
+    max_results: int = 10,
+    user: User = Depends(require_user),
+) -> dict:
+    """Live YouTube search for geopolitical clips. Returns metadata only —
+    no download. The frontend can deep-link to YouTube; the seed_clips
+    pipeline can be triggered separately to ingest a specific result."""
+    if not q.strip():
+        raise HTTPException(400, "empty query")
+    try:
+        from backend.scrapers.geopolitical_clips import yt_dlp_search
+
+        results = await asyncio.to_thread(
+            yt_dlp_search, q.strip(), min(max_results, 20)
+        )
+    except Exception as e:  # noqa: BLE001
+        log.exception("yt-dlp search failed")
+        raise HTTPException(503, f"search unavailable: {e}")
+    return {"query": q, "results": results}
 
 
 @app.get("/ipos")
@@ -391,6 +415,22 @@ async def chat_stream_route(
             "x-accel-buffering": "no",
             "connection": "keep-alive",
         },
+    )
+
+
+@app.post("/report/pdf")
+async def report_pdf(
+    report: Report, user: User = Depends(require_user)
+) -> StreamingResponse:
+    """Render the synthesized Report into a Bunq-themed PDF download."""
+    from fastapi.responses import Response
+
+    pdf_bytes = await asyncio.to_thread(render_report_pdf, report)
+    fname = f"sauron-{report.ticker.replace('.', '_')}-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M')}.pdf"
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"content-disposition": f'attachment; filename="{fname}"'},
     )
 
 

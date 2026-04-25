@@ -36,6 +36,14 @@ export function SectionCard({
     support?: string;
     resistance?: string;
     metrics?: Record<string, unknown>;
+    links?: { label: string; url: string }[];
+    top_stories?: {
+      title: string;
+      source: string;
+      url?: string;
+      published?: string;
+      why_it_matters: string;
+    }[];
   };
 
   return (
@@ -98,6 +106,62 @@ export function SectionCard({
             ))}
           </div>
         )}
+        {extra.top_stories && extra.top_stories.length > 0 && (
+          <div className="mt-3 space-y-1.5">
+            <div className="font-mono text-[9px] uppercase tracking-[0.18em] text-[var(--bunq-faint)]">
+              Top stories
+            </div>
+            {extra.top_stories.map((s, i) => (
+              <a
+                key={i}
+                href={s.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block rounded-lg p-2 transition hover:bg-[var(--bunq-surface-2)]"
+              >
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className="text-[11px] font-bold text-[var(--bunq-text)]/95 leading-snug">
+                    {s.title}
+                  </span>
+                  <span className="shrink-0 font-mono text-[9px] text-[var(--bunq-faint)]">
+                    ↗
+                  </span>
+                </div>
+                <div className="mt-0.5 font-mono text-[9px] text-[var(--bunq-faint)]">
+                  {s.source}
+                  {s.published ? ` · ${s.published.slice(0, 16)}` : ""}
+                </div>
+                {s.why_it_matters && (
+                  <div className="mt-1 text-[10px] text-[var(--bunq-muted)] leading-snug">
+                    {s.why_it_matters}
+                  </div>
+                )}
+              </a>
+            ))}
+          </div>
+        )}
+
+        {extra.links && extra.links.length > 0 && (
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            {extra.links.map((l) => (
+              <a
+                key={l.url}
+                href={l.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="rounded-full px-2.5 py-0.5 font-mono text-[10px]"
+                style={{
+                  background: "var(--bunq-surface-2)",
+                  border: "1px solid var(--bunq-border-strong)",
+                  color: "var(--bunq-green)",
+                }}
+              >
+                {l.label} ↗
+              </a>
+            ))}
+          </div>
+        )}
+
         {section.sources && section.sources.length > 0 && (
           <div className="mt-3 flex flex-wrap gap-1 font-mono text-[10px] text-[var(--bunq-faint)]">
             {section.sources.map((s) => (

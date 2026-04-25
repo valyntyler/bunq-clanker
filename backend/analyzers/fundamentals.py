@@ -50,6 +50,16 @@ Return STRICT JSON with keys:
                     "net_income": f.net_income,
                     "profit_margin": f.profit_margin,
                 },
+                "links": [
+                    {
+                        "label": "Yahoo Finance",
+                        "url": f"https://finance.yahoo.com/quote/{symbol}",
+                    },
+                    {
+                        "label": "SEC EDGAR",
+                        "url": f"https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK={symbol}&type=10-K&dateb=&owner=include&count=40",
+                    },
+                ],
             },
         ),
         f,
