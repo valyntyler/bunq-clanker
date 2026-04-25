@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Modal } from "@/components/Modal";
+import { DropZone } from "@/components/DropZone";
 import {
   submitEvidence,
   uploadEvidenceStream,
@@ -468,17 +469,37 @@ function FileTab({
     audio: "M4A / MP3 / WAV. AWS Transcribe + librosa prosody → Claude tone interpretation.",
     pdf: "Up to 30 pages. PyMuPDF extracts text; Claude scores it as supplementary evidence.",
   };
+  const verb: Record<typeof kind, string> = {
+    image: "image",
+    video: "video",
+    audio: "audio file",
+    pdf: "PDF",
+  };
   return (
     <div className="mt-3">
       <label className="text-[10px] font-mono uppercase tracking-wider text-zinc-500">
         {kind} · max {maxMb}MB
       </label>
-      <input
-        type="file"
+      <DropZone
         accept={accept}
-        onChange={(e) => onFile(e.target.files?.[0] ?? null)}
-        className="mt-1 block w-full text-xs file:mr-3 file:rounded-md file:border-0 file:bg-violet-700 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-white hover:file:bg-violet-600"
-      />
+        onFile={(f) => onFile(f)}
+        ariaLabel={`Choose or drop a ${verb[kind]}`}
+        className="mt-1 flex flex-col items-start gap-1 rounded-2xl px-4 py-4 text-left transition"
+        style={{
+          background: "var(--bunq-surface-2)",
+          border: "1px dashed var(--bunq-border-strong)",
+        }}
+      >
+        <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-[var(--bunq-muted)]">
+          drop a {verb[kind]} here
+        </span>
+        <span className="text-sm font-semibold text-[var(--bunq-text)]">
+          {file ? "Replace file" : `Choose / drop ${verb[kind]}`}
+        </span>
+        <span className="text-[11px] text-[var(--bunq-muted)]">
+          Drag from your desktop, or click to browse.
+        </span>
+      </DropZone>
       {file && (
         <div className="mt-1 truncate text-[11px] text-zinc-400">
           {file.name} · {(file.size / (1024 * 1024)).toFixed(2)} MB

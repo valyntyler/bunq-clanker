@@ -11,6 +11,7 @@ import {
 } from "recharts";
 import { AuthGuard } from "@/components/AuthGuard";
 import { DataProvenance } from "@/components/DataProvenance";
+import { DropZone } from "@/components/DropZone";
 import {
   scanReceipt,
   sendSplitRequests,
@@ -294,36 +295,29 @@ function Uploader({
               </span>
             </button>
 
-            <label
-              className="flex cursor-pointer flex-col items-start gap-1 rounded-2xl px-5 py-4 text-left transition hover:brightness-110"
+            <DropZone
+              accept="image/*"
+              capture="environment"
+              disabled={status === "scanning"}
+              onFile={onFile}
+              ariaLabel="Choose or capture a receipt photo"
+              className="flex flex-col items-start gap-1 rounded-2xl px-5 py-4 text-left transition hover:brightness-110 disabled:opacity-50"
               style={{
                 background: "var(--bunq-surface-2)",
-                border: "1px solid var(--bunq-border)",
+                border: "1px dashed var(--bunq-border)",
               }}
             >
               <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--bunq-muted)]">
-                photo · file
+                photo · file · drop here
               </span>
               <span className="text-base font-bold text-[var(--bunq-text)]">
-                Choose / capture
+                Choose / capture / drop
               </span>
               <span className="text-xs text-[var(--bunq-muted)]">
                 On phones this opens the rear camera; on desktop it picks an
-                image.
+                image — or drag a receipt straight onto this card.
               </span>
-              <input
-                type="file"
-                accept="image/*"
-                capture="environment"
-                className="hidden"
-                disabled={status === "scanning"}
-                onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  if (f) onFile(f);
-                  e.currentTarget.value = "";
-                }}
-              />
-            </label>
+            </DropZone>
           </div>
 
           {camError && (

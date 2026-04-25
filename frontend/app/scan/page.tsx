@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { AuthGuard } from "@/components/AuthGuard";
 import { DataProvenance } from "@/components/DataProvenance";
+import { DropZone } from "@/components/DropZone";
 import {
   openScanSocket,
   scanImage,
@@ -459,37 +460,29 @@ function ScanPage() {
               </span>
             </button>
 
-            <label
-              className="flex cursor-pointer flex-col items-start gap-1 rounded-2xl px-5 py-6 text-left transition hover:brightness-110"
+            <DropZone
+              accept="image/*"
+              capture="environment"
+              onFile={(f) => void handleFile(f)}
+              ariaLabel="Choose or capture an image"
+              className="flex flex-col items-start gap-1 rounded-2xl px-5 py-6 text-left transition hover:brightness-110"
               style={{
                 background: "var(--bunq-surface-2)",
-                border: "1px solid var(--bunq-border)",
+                border: "1px dashed var(--bunq-border)",
               }}
             >
               <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--bunq-muted)]">
-                photo · video frame
+                photo · video frame · drop here
               </span>
               <span className="text-base font-bold text-[var(--bunq-text)]">
-                Choose / capture
+                Choose / capture / drop
               </span>
               <span className="text-xs text-[var(--bunq-muted)]">
                 On phones this opens the rear camera; on desktop it picks an
-                image. Videos: take a still and upload that.
+                image — or drag a JPEG/PNG/WebP straight onto this card.
+                Videos: take a still and upload that.
               </span>
-              <input
-                type="file"
-                accept="image/*"
-                // The capture attribute is what makes mobile open the rear
-                // camera directly. Desktop browsers ignore it.
-                capture="environment"
-                className="hidden"
-                onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  if (f) void handleFile(f);
-                  e.currentTarget.value = "";
-                }}
-              />
-            </label>
+            </DropZone>
           </div>
         )}
       </section>
