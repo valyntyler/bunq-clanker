@@ -300,9 +300,24 @@ async def geopolitical_search(
 
 
 @app.get("/ipos")
-def ipos_list(user: User = Depends(require_user)) -> dict:
-    """Curated calendar of upcoming / rumored IPOs with the brief view."""
-    return list_ipos()
+async def ipos_list(user: User = Depends(require_user)) -> dict:
+    """Curated calendar of upcoming / rumored IPOs PLUS live recent S-1
+    filings pulled from SEC EDGAR's atom feed (no API key — public).
+    """
+    from backend.scrapers.edgar_ipos import fetch_recent_ipo_filings, to_dict as _f_dict
+
+    fixture = list_ipos()
+    try:
+        live = await asyncio.to_thread(fetch_recent_ipo_filings, 40)
+        recent_filings = [_f_dict(f) for f in live]
+    except Exception:  # noqa: BLE001
+        log.exception("edgar fetch failed")
+        recent_filings = []
+    return {
+        **fixture,
+        "recent_filings": recent_filings,
+        "recent_filings_source": "SEC EDGAR · S-1 + S-1/A · live",
+    }
 
 
 @app.get("/ipos/{slug}")
@@ -390,6 +405,15 @@ async def trending(
         "window_hours": hours,
         "trending": out,
     }
+
+
+@app.get("/me/spending")
+def me_spending(user: User = Depends(require_user)) -> dict:
+    """Aggregated spend insights — monthly totals, category breakdown,
+    top merchants, by-ticker holdings, and ticker-discovery suggestions
+    for peers in categories the user spends in but doesn't yet hold."""
+    from backend.analyzers.spending_insights import compute, to_dict
+    return to_dict(compute())
 
 
 @app.get("/me/investments")

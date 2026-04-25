@@ -427,6 +427,31 @@ export async function meAnalyses(): Promise<{ analyses: AnalysisRow[] }> {
   );
 }
 
+export interface SpendingInsights {
+  total_eur: number;
+  visit_count: number;
+  by_month: { month: string; spend_eur: number }[];
+  by_category: { category: string; spend_eur: number; count: number }[];
+  top_merchants: { merchant: string; spend_eur: number; count: number }[];
+  by_ticker: {
+    ticker: string;
+    spend_eur: number;
+    count: number;
+    last_visit: string;
+    category: string | null;
+  }[];
+  discovery: {
+    ticker: string;
+    category: string;
+    rationale: string;
+    anchor_ticker: string | null;
+  }[];
+}
+
+export async function meSpending(): Promise<SpendingInsights> {
+  return j<SpendingInsights>(await authFetch(`${BACKEND_URL}/me/spending`));
+}
+
 export interface OhlcvBar {
   date: string;
   open: number;
@@ -525,10 +550,22 @@ export interface IpoThesis {
   confidence: number;
 }
 
+export interface EdgarFiling {
+  title: string;
+  company: string;
+  form: string;
+  cik: string;
+  filed_at: string;
+  url: string;
+  summary: string;
+}
+
 export async function listIpos(): Promise<{
   as_of: string;
   disclaimer: string;
   ipos: IpoBrief[];
+  recent_filings?: EdgarFiling[];
+  recent_filings_source?: string;
 }> {
   return j(await authFetch(`${BACKEND_URL}/ipos`));
 }

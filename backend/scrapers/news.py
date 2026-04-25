@@ -30,14 +30,21 @@ class NewsItem:
 
 
 def fetch_news(query: str, limit: int = 40) -> list[NewsItem]:
-    """Prefer NewsAPI if keyed; else Google News RSS."""
+    """Prefer NewsAPI if keyed; else Google News RSS. Trusted-outlet items
+    (Reuters / Bloomberg / WSJ / FT / AP / Yahoo Finance / etc.) are sorted
+    to the top so Claude reasons from better-sourced material first."""
+    from backend.scrapers.trusted_outlets import boost
+
     key = os.getenv("NEWSAPI_KEY")
+    raw: list[NewsItem]
     if key:
         try:
-            return _fetch_newsapi(query, key, limit)
+            raw = _fetch_newsapi(query, key, limit)
         except Exception:
-            pass
-    return _fetch_google_news_rss(query, limit)
+            raw = _fetch_google_news_rss(query, limit)
+    else:
+        raw = _fetch_google_news_rss(query, limit)
+    return boost(raw, key="url")
 
 
 def _fetch_newsapi(query: str, key: str, limit: int) -> list[NewsItem]:

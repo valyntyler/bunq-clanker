@@ -4,15 +4,18 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { AuthGuard } from "@/components/AuthGuard";
 import { Markdown } from "@/components/Markdown";
-import { UserSourcePreview } from "@/components/SourcePreview";
+import { SourceMedia, UserSourcePreview } from "@/components/SourcePreview";
+import { SpendingSection } from "@/components/SpendingSection";
 import {
   meAnalyses,
   meEvidence,
   meInvestments,
+  meSpending,
   type AnalysisRow,
   type EvidenceRow,
   type InvestmentList,
   type InvestmentRow,
+  type SpendingInsights,
   type UserSource,
 } from "@/lib/api";
 
@@ -28,17 +31,24 @@ function Dashboard() {
   const [inv, setInv] = useState<InvestmentList | null>(null);
   const [ev, setEv] = useState<EvidenceRow[] | null>(null);
   const [an, setAn] = useState<AnalysisRow[] | null>(null);
+  const [spend, setSpend] = useState<SpendingInsights | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [previewSource, setPreviewSource] = useState<UserSource | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([meInvestments(true), meEvidence(), meAnalyses()])
-      .then(([i, e, a]) => {
+    Promise.all([
+      meInvestments(true),
+      meEvidence(),
+      meAnalyses(),
+      meSpending(),
+    ])
+      .then(([i, e, a, s]) => {
         if (cancelled) return;
         setInv(i);
         setEv(e.evidence);
         setAn(a.analyses);
+        setSpend(s);
       })
       .catch((err) => !cancelled && setError((err as Error).message));
     return () => {
@@ -116,6 +126,9 @@ function Dashboard() {
           sub="sources · runs"
         />
       </div>
+
+      {/* ── spending patterns + discovery ─────────────────── */}
+      {spend && <SpendingSection data={spend} />}
 
       {/* ── investments ─────────────────────────────────── */}
       <Section title="Investments">

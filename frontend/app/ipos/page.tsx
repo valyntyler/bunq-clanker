@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { AuthGuard } from "@/components/AuthGuard";
 import { Markdown } from "@/components/Markdown";
-import { listIpos, type IpoBrief } from "@/lib/api";
+import { listIpos, type EdgarFiling, type IpoBrief } from "@/lib/api";
 
 export default function IposPage() {
   return (
@@ -19,6 +19,8 @@ function Ipos() {
     as_of: string;
     disclaimer: string;
     ipos: IpoBrief[];
+    recent_filings?: EdgarFiling[];
+    recent_filings_source?: string;
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -75,11 +77,69 @@ function Ipos() {
       ) : (
         data && (
           <>
-            <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-              {data.ipos.map((ipo) => (
-                <IpoCard key={ipo.slug} ipo={ipo} />
-              ))}
+            {data.recent_filings && data.recent_filings.length > 0 && (
+              <section>
+                <h2 className="mb-3 flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--bunq-faint)]">
+                  <span
+                    className="inline-flex h-1.5 w-1.5 animate-pulse rounded-full"
+                    style={{ background: "var(--bunq-green)" }}
+                  />
+                  Live · just filed with SEC
+                  <span className="ml-2 normal-case text-[var(--bunq-faint)]/80">
+                    {data.recent_filings_source}
+                  </span>
+                </h2>
+                <div
+                  className="overflow-hidden rounded-2xl"
+                  style={{
+                    background: "var(--bunq-surface)",
+                    border: "1px solid var(--bunq-border)",
+                  }}
+                >
+                  {data.recent_filings.slice(0, 12).map((f) => (
+                    <a
+                      key={`${f.cik}-${f.url}`}
+                      href={f.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-baseline justify-between gap-3 border-t px-4 py-2.5 text-sm transition first:border-t-0 hover:bg-[var(--bunq-surface-2)]"
+                      style={{ borderColor: "var(--bunq-border)" }}
+                    >
+                      <div className="min-w-0">
+                        <div className="bunq-numeral truncate font-bold text-[var(--bunq-text)]">
+                          {f.company}
+                        </div>
+                        <div className="font-mono text-[10px] text-[var(--bunq-faint)]">
+                          {f.form} · CIK {f.cik} · {f.filed_at.slice(0, 10)}
+                        </div>
+                      </div>
+                      <span
+                        className="shrink-0 rounded-full px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.16em]"
+                        style={{
+                          background: "var(--bunq-green-soft)",
+                          color: "var(--bunq-green)",
+                          border: "1px solid rgba(181,255,0,0.30)",
+                        }}
+                      >
+                        Open ↗
+                      </span>
+                    </a>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            <div>
+              <h2 className="mb-3 font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--bunq-faint)]">
+                Curated · big rumored / pre-filed names
+              </h2>
+              <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+                {data.ipos.map((ipo) => (
+                  <IpoCard key={ipo.slug} ipo={ipo} />
+                ))}
+              </div>
             </div>
+
             <footer className="border-t border-[var(--bunq-border)] pt-4 text-[11px] italic text-[var(--bunq-faint)]">
               {data.disclaimer}
             </footer>

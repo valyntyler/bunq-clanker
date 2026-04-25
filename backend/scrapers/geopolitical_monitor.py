@@ -82,17 +82,22 @@ def _fetch_rss(query: str, max_items: int = 12) -> list[dict]:
 
 
 def fetch_recent_events(per_speaker: int = 6) -> list[GeoEvent]:
-    """Pull recent items across all curated speaker queries."""
+    """Pull recent items across all curated speaker queries. Trusted
+    outlets sort first within each speaker bucket so Claude weighs
+    Reuters / Bloomberg / WSJ / official .gov before random aggregators."""
+    from backend.scrapers.trusted_outlets import boost
+
     events: list[GeoEvent] = []
     today = datetime.now(timezone.utc).date().isoformat()
     for speaker, query in QUERIES.items():
         try:
-            items = _fetch_rss(query, max_items=per_speaker)
+            items = _fetch_rss(query, max_items=per_speaker * 2)
         except Exception:  # noqa: BLE001
             continue
-        for it in items[:per_speaker]:
+        bucket: list[GeoEvent] = []
+        for it in items:
             slug = _slugify(it["title"]) or _digest(it["link"])
-            events.append(
+            bucket.append(
                 GeoEvent(
                     event_id=f"{_slugify(speaker)}-{slug}-{today}"[:80],
                     speaker=speaker,
@@ -103,6 +108,8 @@ def fetch_recent_events(per_speaker: int = 6) -> list[GeoEvent]:
                     query=query,
                 )
             )
+        # boost trusted outlets within this speaker's bucket, then take top N
+        events.extend(boost(bucket, key="source_url")[:per_speaker])
     return events
 
 
