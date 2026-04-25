@@ -773,6 +773,114 @@ export async function sendSplitRequests(args: {
   );
 }
 
+// ---- live earnings-call co-pilot -------------------------------------
+
+export type CallTone =
+  | "confident"
+  | "defensive"
+  | "hedging"
+  | "neutral"
+  | "concerned"
+  | "bullish";
+
+export interface EarningsChunkScore {
+  index: number;
+  text: string;
+  tone: CallTone | string;
+  score: number;
+  hedging: string[];
+  commitments: string[];
+  key_topics: string[];
+  shift: string;
+  shift_reason: string;
+}
+
+export interface EarningsSummary {
+  headline: string;
+  tone_overall: CallTone | string;
+  score_overall: number;
+  top_commitments: string[];
+  top_concerns: string[];
+  key_shifts: string[];
+}
+
+export type EarningsStepStatus = "running" | "done" | "error";
+
+export interface EarningsStepEvent {
+  step:
+    | "yt_dlp"
+    | "upload_s3"
+    | "transcribe"
+    | "scoring"
+    | "summary";
+  status: EarningsStepStatus;
+  detail?: Record<string, unknown>;
+}
+
+export interface EarningsStreamHandlers {
+  onStep?: (ev: EarningsStepEvent) => void;
+  onChunk?: (chunk: EarningsChunkScore) => void;
+  onChunkError?: (err: { index: number; message: string }) => void;
+  onSummary?: (summary: EarningsSummary) => void;
+  onDone?: () => void;
+  signal?: AbortSignal;
+}
+
+export async function streamEarningsCall(args: {
+  url: string;
+  ticker: string;
+  companyName?: string;
+  wordsPerChunk?: number;
+  maxChunks?: number;
+} & EarningsStreamHandlers): Promise<void> {
+  const r = await authFetch(`${BACKEND_URL}/earnings-call/stream`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      url: args.url,
+      ticker: args.ticker,
+      company_name: args.companyName,
+      words_per_chunk: args.wordsPerChunk,
+      max_chunks: args.maxChunks,
+    }),
+    signal: args.signal,
+  });
+  if (!r.ok || !r.body) {
+    throw new Error(
+      `earnings stream failed: ${r.status} ${r.statusText}`
+    );
+  }
+  const reader = r.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) return;
+    buffer += decoder.decode(value, { stream: true });
+    let idx;
+    while ((idx = buffer.indexOf("\n\n")) >= 0) {
+      const chunk = buffer.slice(0, idx);
+      buffer = buffer.slice(idx + 2);
+      for (const line of chunk.split("\n")) {
+        if (!line.startsWith("data: ")) continue;
+        const payload = line.slice(6).trim();
+        if (!payload) continue;
+        try {
+          const ev = JSON.parse(payload);
+          if (ev.step) args.onStep?.(ev as EarningsStepEvent);
+          else if (ev.chunk) args.onChunk?.(ev.chunk as EarningsChunkScore);
+          else if (ev.chunk_error) args.onChunkError?.(ev.chunk_error);
+          else if (ev.summary) args.onSummary?.(ev.summary as EarningsSummary);
+          else if (ev.done) args.onDone?.();
+          else if (ev.error) throw new Error(ev.error);
+        } catch {
+          // ignore parse errors
+        }
+      }
+    }
+  }
+}
+
 // ---- live newsroom feed ----------------------------------------------
 
 export interface NewsroomItem {

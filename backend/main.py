@@ -712,6 +712,57 @@ def me_analyses(
     }
 
 
+# ---- live earnings-call co-pilot -------------------------------------
+
+
+@app.post("/earnings-call/stream")
+async def earnings_call_stream(
+    payload: dict,
+    user: User = Depends(require_user),
+) -> StreamingResponse:
+    """Stream the live earnings-call co-pilot end-to-end.
+
+    Body: { url: str, ticker: str, company_name?: str, words_per_chunk?: int }
+
+    SSE events: yt_dlp / upload_s3 / transcribe / scoring progress, then
+    one {chunk: {...}} per scored window, then {summary: {...}}, then
+    {done: True}.
+    """
+    url = (payload.get("url") or "").strip()
+    ticker = (payload.get("ticker") or "").strip().upper()
+    company = (payload.get("company_name") or ticker).strip()
+    if not url or not ticker:
+        raise HTTPException(400, "url and ticker required")
+    words_per_chunk = int(payload.get("words_per_chunk") or 220)
+    max_chunks = int(payload.get("max_chunks") or 30)
+
+    from backend.services.earnings_copilot import stream_earnings_call
+
+    async def event_gen():
+        try:
+            async for ev in stream_earnings_call(
+                url=url,
+                ticker=ticker,
+                company=company,
+                words_per_chunk=words_per_chunk,
+                max_chunks=max_chunks,
+            ):
+                yield f"data: {_json.dumps(ev)}\n\n"
+        except Exception as e:  # noqa: BLE001
+            log.exception("earnings-call stream failed")
+            yield f"data: {_json.dumps({'error': str(e)})}\n\n"
+
+    return StreamingResponse(
+        event_gen(),
+        media_type="text/event-stream",
+        headers={
+            "cache-control": "no-cache",
+            "x-accel-buffering": "no",
+            "connection": "keep-alive",
+        },
+    )
+
+
 # ---- live newsroom feed ----------------------------------------------
 
 

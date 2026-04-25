@@ -47,6 +47,7 @@ export type ProvenanceKind =
   | "pulse_check"
   | "index_options"
   | "newsroom"
+  | "earnings_copilot"
   | "verdict";
 
 interface ProvenanceMeta {
@@ -291,6 +292,17 @@ const REGISTRY: Record<ProvenanceKind, ProvenanceMeta> = {
     freshness: "Static fixture; refreshed when the analysis universe changes.",
     caveat:
       "Demo-grade fixture; in production this would be backed by a paid index-constituents data feed.",
+  },
+  earnings_copilot: {
+    label: "Earnings call · Claude live-scoring",
+    what: "Per-chunk tone, hedging, commitments, and tone-shift flags from the earnings call's transcript, streamed in real time as Claude reads through the call.",
+    source:
+      "YouTube URL → yt-dlp pulls bestaudio → AWS Transcribe (single batch job, polled with progress) → transcript split into ~220-word windows → Claude Sonnet 4 scores each window with rolling-baseline context.",
+    method:
+      "The transcribe step is a one-time batch cost; the analysis itself streams chunk-by-chunk so tone shifts surface as Claude reads forward. Each chunk is scored against the rolling average so 'hedging' shows up only when it's elevated relative to baseline.",
+    freshness: "Whatever's on YouTube — works on completed earnings calls and live streams (live mode pulls what's available as the recording extends).",
+    caveat:
+      "Demo-grade: transcribe is batch (not streaming), and for very long calls we cap at ~30 chunks to keep the Claude bill bounded.",
   },
   newsroom: {
     label: "Newsroom · Reuters / Bloomberg / AP / WSJ / FT / Yahoo / CNBC",

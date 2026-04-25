@@ -20,6 +20,7 @@ import { AddEvidenceModal } from "@/components/AddEvidenceModal";
 import { AuthGuard } from "@/components/AuthGuard";
 import { ChatPanel } from "@/components/ChatPanel";
 import { DataProvenance } from "@/components/DataProvenance";
+import { EarningsCopilotSection } from "@/components/EarningsCopilotSection";
 import { GeopoliticalOverlayCard } from "@/components/GeopoliticalOverlayCard";
 import { IndexOptionsSection } from "@/components/IndexOptionsSection";
 import { LiveClipSearch } from "@/components/LiveClipSearch";
@@ -763,6 +764,13 @@ function AnalyzePage() {
             ))}
           </ul>
         </section>
+      )}
+
+      {report && (
+        <EarningsCopilotSection
+          ticker={ticker}
+          companyName={report.company_name}
+        />
       )}
 
       {report && (
