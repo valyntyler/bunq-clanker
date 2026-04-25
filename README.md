@@ -1,6 +1,6 @@
 # Sauron Wallet
 
-> **Point your phone at any product. Get a hedge-fund-grade investment thesis in 90 seconds. Move real (sandbox) money in two taps.**
+> **Hold any product up to your webcam. Get a hedge-fund-grade investment thesis in 90 seconds. Move real (sandbox) money in two clicks.**
 
 A multimodal AI investment analyst, built for **bunq Hackathon 7.0 — Multimodal AI**. Sauron Wallet ingests text, images, audio, video, sensor (GPS) and behavioural (Bunq spending) data, runs each modality through Claude Sonnet 4 on AWS Bedrock, synthesises a sourced **BUY / HOLD / AVOID** verdict with a next-quarter revenue forecast, and — on user approval — moves euros between Bunq sandbox accounts and fires a paper trade on Alpaca.
 
@@ -29,7 +29,7 @@ Bunq sits on this signal **natively** — every transaction across millions of u
 
 ## The "wow" loop, in 90 seconds
 
-1. **Point your phone camera** at a six-pack of Heineken in your fridge.
+1. **Hold a six-pack of Heineken** up to your laptop webcam.
 2. The **AR HUD** (over a persistent WebSocket → Claude vision) draws a green box around the bottle: `HEIA.AS · Heineken · 92% sure · ↗`. It also resolves *Dove → Unilever / UNA.AS* style sub-brands automatically.
 3. A **wallet strip** shows underneath: *"loyal · €342 spent · 11 visits · last yesterday · accelerating ↗"* — your own Bunq spending history at every Heineken venue, surfaced live from the API.
 4. **Tap the box** → routes you to `/analyze/HEIA.AS`. A Bloomberg-terminal-style log starts streaming as 12 analyzer modules fan out in parallel.

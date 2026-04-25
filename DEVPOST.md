@@ -10,7 +10,7 @@ Paste these sections into the corresponding DevPost form fields.
 
 ## Tagline (one line)
 
-> Point your phone at any product. Get a hedge-fund-grade investment thesis in 90 seconds. Move real (sandbox) money in two taps.
+> Hold any product up to your webcam. Get a hedge-fund-grade investment thesis in 90 seconds. Move real (sandbox) money in two clicks.
 
 ---
 
@@ -18,7 +18,7 @@ Paste these sections into the corresponding DevPost form fields.
 
 Hedge funds pay firms like YipitData and Earnest Analytics **millions per year** for one specific signal: aggregated, anonymised consumer-card spending data, because it's a **0.6–0.8-correlation leading indicator of quarterly revenue.** When card-panel spend at a merchant rises N% year-over-year in April–June, that company's reported Q2 revenue typically follows.
 
-Bunq sits on this signal **natively** — every transaction across millions of users. We asked the obvious question: *what if regular Bunq users had access to the same kind of leading-indicator signal hedge funds buy from those panels — but applied to their own wallet, in their own pocket?*
+Bunq sits on this signal **natively** — every transaction across millions of users. We asked the obvious question: *what if regular Bunq users had access to the same kind of leading-indicator signal hedge funds buy from those panels — but applied to their own wallet, in their own browser?*
 
 Sauron Wallet is the answer. It's the retail-investor product on top of Bunq's transaction graph, with a multimodal evidence layer stacked on top so the verdict isn't naked alt-data — it's alt-data cross-checked against fundamentals, news sentiment, chart vision, earnings-call audio, geopolitical video, the user's own spend, and anything they paste in mid-analysis.
 
@@ -28,13 +28,13 @@ Sauron Wallet turns any visual or auditory cue in the real world into a fully-so
 
 The signature flow:
 
-1. **Point your phone camera at a Heineken bottle in your fridge.** A live AR HUD (running over a persistent WebSocket to Claude vision) draws a green box on the bottle: `HEIA.AS · Heineken · 92% sure · ↗`. It also resolves sub-brands: a Dove bottle resolves to *UNA.AS / Unilever*, a Cadillac to *GM*, etc.
+1. **Hold a Heineken bottle up to your laptop webcam.** A live AR HUD (running over a persistent WebSocket to Claude vision) draws a green box on the bottle: `HEIA.AS · Heineken · 92% sure · ↗`. It also resolves sub-brands: a Dove bottle resolves to *UNA.AS / Unilever*, a Cadillac to *GM*, etc.
 2. **Underneath the box, a wallet strip appears**: *"loyal · €342 spent · 11 visits · last yesterday · accelerating ↗"* — your own Bunq spending history at every Heineken venue, surfaced live from the API.
 3. **Tap the box.** A Bloomberg-style streaming log fires off as 12 analyzer modules run in parallel: SEC 10-K, news sentiment, candlestick chart vision, earnings-call audio with prosody and tone analysis, geopolitical video clips with deepfake checks, an aggregated Bunq consumer-panel forecast, public sentiment pulled from 5 sources (Reddit, StockTwits, HackerNews, news, YouTube), and your own personal Bunq spending overlay.
 4. **Sixty seconds later you have a verdict banner**: BUY · 78% confidence · `+3 to +5%` Q2 revenue beat — with every claim cited back to the module that supports it.
 5. **Tap "Choose amount"**, slider, confirm. Your Bunq Main Wallet drops by €X, an auto-created `Sauron · HEIA.AS` pot appears with €X, and an Alpaca paper order ID prints on the receipt — all via real Bunq sandbox API calls. No mocks.
 
-The same flow works from a barcode, a website screenshot, a billboard, a typed ticker, or — if you're standing outside an HQ — your phone's GPS reverse-geocoding to the nearest covered company.
+The same flow works from a barcode, a website screenshot, a billboard, a typed ticker, or — if you're working from a café next to an HQ — your browser's geolocation reverse-geocoding to the nearest covered company.
 
 Beyond the camera flow, the product also includes:
 
