@@ -26,18 +26,22 @@ export function ChatPanel({ report }: { report: Report }) {
   const [streaming, setStreaming] = useState(false);
   const [streamingText, setStreamingText] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
-  // Voice state
+  // Voice state — these need to be state, not refs: the support check
+  // runs after first render (only on the client, since the underlying
+  // APIs touch `window`), and refs don't trigger re-renders, so any
+  // refs-based gate would leave the mic button permanently invisible.
   const [ttsOn, setTtsOn] = useState(true);
+  const [voiceInputAvail, setVoiceInputAvail] = useState(false);
+  const [ttsAvail, setTtsAvail] = useState(false);
   const [voiceError, setVoiceError] = useState<string | null>(null);
-  const voiceInputAvail = useRef(false);
-  const ttsAvail = useRef(false);
 
   useEffect(() => {
-    voiceInputAvail.current = isVoiceInputSupported();
-    ttsAvail.current = isTtsSupported();
-    if (ttsAvail.current) warmVoices();
+    const vi = isVoiceInputSupported();
+    const tt = isTtsSupported();
+    setVoiceInputAvail(vi);
+    setTtsAvail(tt);
+    if (tt) warmVoices();
     return () => {
-      // Stop any in-flight TTS when the panel unmounts (e.g. analyse page nav).
       stopSpeaking();
     };
   }, []);
@@ -95,7 +99,7 @@ export function ChatPanel({ report }: { report: Report }) {
         },
       });
       setHistory([...newHistory, { role: "assistant", content: acc }]);
-      if (ttsOn && ttsAvail.current) {
+      if (ttsOn && ttsAvail) {
         // Speak the cleaned full reply once streaming has finished, so
         // we don't stutter on token boundaries.
         speakText(cleanForSpeech(acc));
@@ -136,7 +140,7 @@ export function ChatPanel({ report }: { report: Report }) {
           chat with the analyst · {report.ticker}
         </div>
         <div className="flex items-center gap-2">
-          {ttsAvail.current && (
+          {ttsAvail && (
             <button
               onClick={() => {
                 setTtsOn((v) => {
@@ -183,7 +187,7 @@ export function ChatPanel({ report }: { report: Report }) {
             <p className="text-xs text-[var(--bunq-muted)]">
               Ask about the verdict, the panel data, or what would change the
               call. Replies are grounded in the modules above.
-              {voiceInputAvail.current && (
+              {voiceInputAvail && (
                 <>
                   {" "}
                   <span style={{ color: "var(--bunq-green)" }}>
@@ -232,7 +236,7 @@ export function ChatPanel({ report }: { report: Report }) {
         className="flex gap-2 rounded-b-3xl border-t p-3"
         style={{ borderColor: "var(--bunq-border)" }}
       >
-        {voiceInputAvail.current && (
+        {voiceInputAvail && (
           <MicButton
             active={mic.active}
             level={mic.level}
