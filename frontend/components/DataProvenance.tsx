@@ -46,6 +46,7 @@ export type ProvenanceKind =
   | "receipt_scan"
   | "pulse_check"
   | "index_options"
+  | "newsroom"
   | "verdict";
 
 interface ProvenanceMeta {
@@ -290,6 +291,15 @@ const REGISTRY: Record<ProvenanceKind, ProvenanceMeta> = {
     freshness: "Static fixture; refreshed when the analysis universe changes.",
     caveat:
       "Demo-grade fixture; in production this would be backed by a paid index-constituents data feed.",
+  },
+  newsroom: {
+    label: "Newsroom · Reuters / Bloomberg / AP / WSJ / FT / Yahoo / CNBC",
+    what: "Live wire-service headlines polled from a curated set of trusted financial outlets, with each item tagged against your watchlist (every ticker you've analysed or invested in).",
+    source:
+      "Google News RSS with site-filter queries (site:reuters.com, site:bloomberg.com, site:apnews.com, site:wsj.com, site:ft.com, site:finance.yahoo.com, site:cnbc.com).",
+    method:
+      "One process-wide background poller every 90s, dedupe by URL hash, fan-out via SSE to subscribed clients. Watchlist matching is a fast word-boundary text match on title+snippet against ticker symbols + company names + sub-brand aliases (Magnum → UNA.AS).",
+    freshness: "Polled every 90s. Snapshot first, then live updates while connected.",
   },
   pulse_check: {
     label: "Public sentiment · multi-source",

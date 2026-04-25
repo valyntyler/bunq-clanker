@@ -87,9 +87,17 @@ app = FastAPI(title="Prospectus / Sauron Wallet", version="0.0.1")
 
 
 @app.on_event("startup")
-def _startup() -> None:
+async def _startup() -> None:
     init_db()
     _migrate_investment_columns()
+    # Kick off the singleton newsroom poller. Lives for the life of the
+    # process; subscribers (SSE clients) tap into its fan-out queue.
+    try:
+        from backend.services.newsroom import get_newsroom
+
+        await get_newsroom().start()
+    except Exception:  # noqa: BLE001
+        log.exception("newsroom: failed to start poller (non-fatal)")
 
 
 def _migrate_investment_columns() -> None:
@@ -702,6 +710,158 @@ def me_analyses(
             {**r.model_dump(), "created_at": r.created_at.isoformat()} for r in rows
         ]
     }
+
+
+# ---- live newsroom feed ----------------------------------------------
+
+
+def _user_watchlist(session: Session, user: User) -> list[dict]:
+    """Build the user's watchlist from their analysis history + invest
+    receipts. Each row is {ticker, company_name, aliases?} so the
+    newsroom matcher can hit on company name + sub-brand aliases too.
+
+    Aliases come from backend/fixtures/merchant_aliases.json so news about
+    'Magnum' counts as relevant for a UNA.AS watcher even though only the
+    sub-brand is mentioned in the headline."""
+    import json as _json_local
+    from pathlib import Path
+
+    seen: dict[str, dict] = {}
+    # 1) every analysis the user has run
+    rows = session.exec(
+        select(AnalysisRun)
+        .where(AnalysisRun.user_id == user.id)
+        .order_by(AnalysisRun.created_at.desc())
+        .limit(200)
+    ).all()
+    for r in rows:
+        if not r.ticker:
+            continue
+        if r.ticker in seen:
+            continue
+        seen[r.ticker] = {
+            "ticker": r.ticker,
+            "company_name": r.company_name or "",
+            "aliases": [],
+        }
+    # 2) every ticker the user has invested in
+    inv_rows = session.exec(
+        select(Investment)
+        .where(Investment.user_id == user.id)
+        .limit(200)
+    ).all()
+    for r in inv_rows:
+        if not r.ticker or r.ticker in seen:
+            continue
+        seen[r.ticker] = {
+            "ticker": r.ticker,
+            "company_name": r.company_name or "",
+            "aliases": [],
+        }
+    # 3) hydrate aliases from the curated merchant-alias map
+    aliases_path = Path(__file__).parent / "fixtures" / "merchant_aliases.json"
+    if aliases_path.exists():
+        try:
+            alias_map = _json_local.loads(aliases_path.read_text())
+            for ticker, w in seen.items():
+                w["aliases"] = list(alias_map.get(ticker) or [])
+        except Exception:  # noqa: BLE001
+            pass
+    return list(seen.values())
+
+
+@app.get("/news/recent")
+def news_recent(
+    limit: int = 30,
+    user: User = Depends(require_user),
+    session: Session = Depends(get_session),
+) -> dict:
+    """Most-recent newsroom items, each tagged with which of the user's
+    watchlist tickers it matches (empty list when nothing matches)."""
+    from backend.services.newsroom import (
+        get_newsroom,
+        watchlist_match,
+        to_dict as item_to_dict,
+    )
+
+    watchlist = _user_watchlist(session, user)
+    items: list[dict] = []
+    for it in get_newsroom().recent(min(limit, 100)):
+        d = item_to_dict(it)
+        d["tickers"] = watchlist_match(it, watchlist)
+        items.append(d)
+    return {
+        "as_of": datetime.now(timezone.utc).isoformat(),
+        "items": items,
+        "watchlist": [w["ticker"] for w in watchlist],
+    }
+
+
+@app.post("/news/stream")
+async def news_stream(
+    payload: dict | None = None,
+    user: User = Depends(require_user),
+    session: Session = Depends(get_session),
+) -> StreamingResponse:
+    """SSE — first flushes the cached recent items (filtered by the
+    optional `only_watchlist` flag), then streams new headlines as the
+    poller picks them up.
+
+    Body (optional):
+        { only_watchlist?: bool, limit_initial?: int }
+
+    Each event:
+        {item: {...NewsroomItem dict... + tickers: list[str]}}
+    """
+    from backend.services.newsroom import (
+        get_newsroom,
+        watchlist_match,
+        to_dict as item_to_dict,
+    )
+
+    payload = payload or {}
+    only_watchlist = bool(payload.get("only_watchlist"))
+    limit_initial = int(payload.get("limit_initial") or 20)
+    watchlist = _user_watchlist(session, user)
+
+    nr = get_newsroom()
+    queue = nr.subscribe()
+
+    async def event_gen():
+        try:
+            # First, flush a snapshot of the recent cache so the client has
+            # something to render immediately.
+            for it in nr.recent(limit_initial):
+                d = item_to_dict(it)
+                d["tickers"] = watchlist_match(it, watchlist)
+                if only_watchlist and not d["tickers"]:
+                    continue
+                yield f"data: {_json.dumps({'item': d})}\n\n"
+            # Then keep the stream open and forward new items as they arrive.
+            while True:
+                item = await queue.get()
+                d = item_to_dict(item)
+                d["tickers"] = watchlist_match(item, watchlist)
+                if only_watchlist and not d["tickers"]:
+                    continue
+                yield f"data: {_json.dumps({'item': d, 'fresh': True})}\n\n"
+        except asyncio.CancelledError:
+            raise
+        except Exception as e:  # noqa: BLE001
+            log.exception("news_stream failed")
+            yield f"data: {_json.dumps({'error': str(e)})}\n\n"
+        finally:
+            nr.unsubscribe(queue)
+
+    return StreamingResponse(
+        event_gen(),
+        media_type="text/event-stream",
+        headers={
+            "cache-control": "no-cache",
+            "x-accel-buffering": "no",
+            "connection": "keep-alive",
+        },
+    )
 
 
 # ---- Bunq passthrough — identity + accounts + activity ---------------

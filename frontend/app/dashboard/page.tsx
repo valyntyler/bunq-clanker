@@ -7,6 +7,7 @@ import { Markdown } from "@/components/Markdown";
 import { SourceMedia, UserSourcePreview } from "@/components/SourcePreview";
 import { SpendingSection } from "@/components/SpendingSection";
 import { BunqAccountsSection } from "@/components/BunqAccountsSection";
+import { NewsroomTicker } from "@/components/NewsroomTicker";
 import {
   meAnalyses,
   meEvidence,
@@ -129,6 +130,8 @@ function Dashboard() {
       </div>
 
       {/* ── live Bunq accounts + activity (sandbox) ──────── */}
+      <NewsroomTicker />
+
       <BunqAccountsSection />
 
       {/* ── spending patterns + discovery ─────────────────── */}

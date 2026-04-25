@@ -773,6 +773,76 @@ export async function sendSplitRequests(args: {
   );
 }
 
+// ---- live newsroom feed ----------------------------------------------
+
+export interface NewsroomItem {
+  id: string;
+  title: string;
+  source: string;
+  url: string;
+  published: string;
+  snippet: string;
+  fetched_at: string;
+  /** Subset of the user's watchlist this headline matched. */
+  tickers: string[];
+}
+
+export async function newsroomRecent(
+  limit = 30
+): Promise<{ as_of: string; items: NewsroomItem[]; watchlist: string[] }> {
+  return j(
+    await authFetch(`${BACKEND_URL}/news/recent?limit=${limit}`)
+  );
+}
+
+/** SSE consumer: fires onItem for each cached item, then for every new
+ *  headline as the poller picks it up. `fresh: true` indicates the item
+ *  arrived during this stream session (not part of the initial backlog).
+ *  Returns a Promise that only resolves on close. */
+export async function streamNewsroom(args: {
+  onItem: (item: NewsroomItem, fresh: boolean) => void;
+  onlyWatchlist?: boolean;
+  limitInitial?: number;
+  signal?: AbortSignal;
+}): Promise<void> {
+  const r = await authFetch(`${BACKEND_URL}/news/stream`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      only_watchlist: args.onlyWatchlist ?? false,
+      limit_initial: args.limitInitial ?? 20,
+    }),
+    signal: args.signal,
+  });
+  if (!r.ok || !r.body) {
+    throw new Error(`news stream failed: ${r.status} ${r.statusText}`);
+  }
+  const reader = r.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) return;
+    buffer += decoder.decode(value, { stream: true });
+    let idx;
+    while ((idx = buffer.indexOf("\n\n")) >= 0) {
+      const chunk = buffer.slice(0, idx);
+      buffer = buffer.slice(idx + 2);
+      for (const line of chunk.split("\n")) {
+        if (!line.startsWith("data: ")) continue;
+        const payload = line.slice(6).trim();
+        if (!payload) continue;
+        try {
+          const ev = JSON.parse(payload);
+          if (ev.item) args.onItem(ev.item as NewsroomItem, !!ev.fresh);
+        } catch {
+          // ignore parse errors
+        }
+      }
+    }
+  }
+}
+
 // ---- pulse-check: public-sentiment scrape + Claude analysis ----------
 
 export type SentimentStance = "bullish" | "bearish" | "neutral";
