@@ -406,7 +406,10 @@ export function DataProvenance({
       return;
     }
     const rect = ref.current.getBoundingClientRect();
-    const POPOVER_W = 320; // matches w-80
+    // 360px keeps each provenance row to ~3 lines max — wide enough to
+    // breathe but narrow enough that the popover doesn't dominate the
+    // surface it's annotating.
+    const POPOVER_W = 360;
     const margin = 12;
     const wantLeft = rect.left;
     const overflowsRight =
@@ -474,17 +477,24 @@ export function DataProvenance({
         createPortal(
           <div
             role="tooltip"
-            className="pointer-events-none fixed z-[100] w-80 rounded-xl p-3 shadow-2xl"
+            className="pointer-events-none fixed z-[100] rounded-xl p-3.5"
             style={{
               top: pos.top,
               left: pos.left,
-              background: "var(--bunq-surface)",
+              width: 360,
+              // Solid base + a subtle backdrop blur so the popover reads as a
+              // distinct surface above page text instead of competing with it
+              // — matters most on dense pages like /analyze and /map.
+              background: "rgba(17,18,26,0.97)",
+              backdropFilter: "blur(8px)",
+              WebkitBackdropFilter: "blur(8px)",
               border: "1px solid var(--bunq-border-strong)",
+              boxShadow:
+                "0 24px 48px -8px rgba(0,0,0,0.55), 0 0 0 1px rgba(0,0,0,0.40)",
             }}
           >
-            <span className="block font-mono text-[9px] uppercase tracking-[0.18em] text-[var(--bunq-green)]">
-              {meta.label}
-            </span>
+            {/* The chip below the trigger already shows meta.label, so we
+             *  drop the redundant header in here and lead with WHAT. */}
             <ProvRow label="what" body={meta.what} />
             <ProvRow label="source" body={meta.source} />
             <ProvRow label="method" body={meta.method} />
