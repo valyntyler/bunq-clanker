@@ -47,65 +47,59 @@ class _BunqUserShim:
     bunq_pot_account_id: int
 
 
-def _ensure_pot_funded(shim: Any, target_eur: float) -> None:
-    """Make best effort to leave `target_eur` sitting in the Investment Pot.
+def _ensure_main_funded(shim: Any, target_eur: float) -> None:
+    """Make best effort to leave `target_eur` sitting in the MAIN account
+    (not the pot — /invest pulls from main and grows the per-ticker pot).
 
     Sandbox eventual consistency: sugardaddy@bunq.com auto-accepts
     request-inquiries up to ~€100 each, and even those land 1-3s later
-    rather than synchronously. So we (a) chunk top-ups via the integration,
-    (b) wait a short window for settlement, (c) sweep whatever main has into
-    the pot. Re-running on the next boot catches any remainder.
+    rather than synchronously. So we (a) chunk top-ups via the
+    integration, (b) wait a short window for settlement. Re-running on
+    the next boot catches any remainder.
     """
     import time
-
-    try:
-        pot_now = bunq_i.get_pot_balance_eur(user=shim)
-    except Exception:  # noqa: BLE001
-        log.exception("seed: could not read pot balance")
-        return
-    deficit = target_eur - pot_now
-    if deficit <= 0.5:
-        log.info("seed: pot already at €%.2f (target €%.2f) — nothing to do",
-                 pot_now, target_eur)
-        return
-    log.info(
-        "seed: pot at €%.2f, target €%.2f — funding deficit €%.2f",
-        pot_now, target_eur, deficit,
-    )
 
     try:
         main_now = bunq_i.get_main_balance_eur(user=shim)
     except Exception:  # noqa: BLE001
         log.exception("seed: could not read main balance")
-        main_now = 0.0
-    main_needed = max(0.0, deficit - main_now)
-    if main_needed > 0:
-        try:
-            ids = bunq_i.topup_main_from_sugardaddy(main_needed, user=shim)
-            log.info("seed: fired %d sugardaddy request(s) for €%.2f",
-                     len(ids), main_needed)
-        except Exception:  # noqa: BLE001
-            log.exception("seed: sugardaddy top-up failed (will retry next boot)")
+        return
+    deficit = target_eur - main_now
+    if deficit <= 0.5:
+        log.info(
+            "seed: main already at €%.2f (target €%.2f) — nothing to do",
+            main_now, target_eur,
+        )
+        return
+    log.info(
+        "seed: main at €%.2f, target €%.2f — funding deficit €%.2f",
+        main_now, target_eur, deficit,
+    )
 
-    # Wait up to ~6s for sandbox settlement. Sandbox is eventually consistent
-    # — we poll instead of sleeping a flat number so happy paths stay quick.
-    deadline = time.time() + 6.0
+    try:
+        ids = bunq_i.topup_main_from_sugardaddy(deficit, user=shim)
+        log.info(
+            "seed: fired %d sugardaddy request(s) totalling €%.2f",
+            len(ids), deficit,
+        )
+    except Exception:  # noqa: BLE001
+        log.exception("seed: sugardaddy top-up failed (will retry next boot)")
+        return
+
+    # Wait up to ~10s for sandbox settlement. Sandbox is eventually
+    # consistent — we poll instead of sleeping a flat number so happy
+    # paths stay quick. Sugardaddy occasionally takes a beat to settle the
+    # later chunks of a multi-request top-up.
+    deadline = time.time() + 10.0
     while time.time() < deadline:
         try:
             main_now = bunq_i.get_main_balance_eur(user=shim)
         except Exception:  # noqa: BLE001
             main_now = 0.0
-        if main_now + 0.5 >= deficit:
+        if main_now + 0.5 >= target_eur:
             break
         time.sleep(0.6)
-
-    sweep = min(deficit, main_now)
-    if sweep > 0.5:
-        try:
-            bunq_i.transfer_main_to_pot(sweep, "Sauron demo seed", user=shim)
-            log.info("seed: swept €%.2f main→pot (main=%.2f)", sweep, main_now)
-        except Exception:  # noqa: BLE001
-            log.exception("seed: main→pot sweep failed")
+    log.info("seed: main settled at €%.2f", main_now)
 
 
 def _provision_bunq() -> dict[str, Any] | None:
@@ -168,7 +162,7 @@ def seed_demo_account() -> None:
             bunq_main_account_id=int(user.bunq_main_account_id),
             bunq_pot_account_id=int(user.bunq_pot_account_id or user.bunq_main_account_id),
         )
-        _ensure_pot_funded(shim, DEMO_SEED_AMOUNT_EUR)
+        _ensure_main_funded(shim, DEMO_SEED_AMOUNT_EUR)
     else:
         log.warning("seed: demo user has no Bunq link — /balance will show 0")
 

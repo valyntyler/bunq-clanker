@@ -253,7 +253,8 @@ function DemoCredentialsBanner({
         live demo · public sandbox account
       </div>
       <p className="mt-1 leading-relaxed text-[var(--bunq-text)]">
-        Pre-loaded with a Bunq sandbox link and €1,000 in the Investment Pot.
+        Pre-loaded with a Bunq sandbox link and €1,000 in the Main Wallet —
+        ready to invest.
       </p>
       <div className="mt-2 flex flex-wrap items-center gap-2">
         <code

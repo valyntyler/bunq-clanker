@@ -477,20 +477,22 @@ export function DataProvenance({
         createPortal(
           <div
             role="tooltip"
-            className="pointer-events-none fixed z-[100] rounded-xl p-3.5"
+            // z-[9999] sits above leaflet (which uses 400-700) and any
+            // late-mount overlay we might add — the portal puts us at
+            // document.body so we don't inherit a clipping context.
+            className="pointer-events-none fixed z-[9999] rounded-xl p-3.5"
             style={{
               top: pos.top,
               left: pos.left,
               width: 360,
-              // Solid base + a subtle backdrop blur so the popover reads as a
-              // distinct surface above page text instead of competing with it
-              // — matters most on dense pages like /analyze and /map.
-              background: "rgba(17,18,26,0.97)",
-              backdropFilter: "blur(8px)",
-              WebkitBackdropFilter: "blur(8px)",
+              // Fully opaque so page text never bleeds through. The
+              // earlier 0.97 + backdrop-blur combo looked broken on dense
+              // intro paragraphs (text on either side of the 360px
+              // popover read like the popover itself was transparent).
+              background: "var(--bunq-surface)",
               border: "1px solid var(--bunq-border-strong)",
               boxShadow:
-                "0 24px 48px -8px rgba(0,0,0,0.55), 0 0 0 1px rgba(0,0,0,0.40)",
+                "0 24px 48px -8px rgba(0,0,0,0.65), 0 0 0 1px rgba(0,0,0,0.55)",
             }}
           >
             {/* The chip below the trigger already shows meta.label, so we
