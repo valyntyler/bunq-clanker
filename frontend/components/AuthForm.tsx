@@ -37,7 +37,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
             ? await login(email, password)
             : await register(email, password);
       } else if (provider === "google" || provider === "apple") {
-        res = await authOAuth(provider, email, displayName);
+        res = await authOAuth({ provider, email, displayName, mode });
       } else {
         // bunq — registers a fresh sandbox account
         res = await registerWithBunq({

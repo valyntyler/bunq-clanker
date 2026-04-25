@@ -62,16 +62,24 @@ export async function register(
 
 /** Sign in / sign up via Google or Apple iCloud. The frontend collects the
  *  email + display name; in production we'd verify a real OIDC id_token
- *  here. The same email re-logs an existing user in. */
-export async function authOAuth(
-  provider: "google" | "apple",
-  email: string,
-  displayName?: string
-): Promise<{ token: string; user: AuthUser }> {
+ *  here. `mode` controls whether a missing user is created (register) or
+ *  refused (login) — fixes the bug where the login screen would silently
+ *  mint a new account for any unknown email. */
+export async function authOAuth(args: {
+  provider: "google" | "apple";
+  email: string;
+  displayName?: string;
+  mode: "login" | "register";
+}): Promise<{ token: string; user: AuthUser }> {
   const r = await fetch(`${BACKEND_URL}/auth/oauth`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ provider, email, display_name: displayName }),
+    body: JSON.stringify({
+      provider: args.provider,
+      email: args.email,
+      display_name: args.displayName,
+      mode: args.mode,
+    }),
   });
   if (!r.ok) throw new Error((await r.json()).detail ?? r.statusText);
   return r.json();

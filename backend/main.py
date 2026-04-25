@@ -212,36 +212,68 @@ def auth_oauth(payload: dict, session: Session = Depends(get_session)) -> AuthRe
 
     Hackathon-grade: in production we'd verify a real OIDC id_token from the
     provider; here we accept the email + display_name + provider tag the
-    frontend collects. Re-using the same email auto-logs an existing user in.
+    frontend collects.
 
-    Body: { provider: 'google'|'apple'|str, email: str, display_name?: str }
+    Body:
+        {
+          provider:   'google' | 'apple' | str,
+          email:      str,
+          display_name?: str,
+          mode:       'login' | 'register'      # required — controls whether
+                                                # missing-user / existing-user
+                                                # responds 404 / 409 / 200
+        }
+
+    Behaviour:
+        mode=login    + user missing  → 404 "no account with that email"
+        mode=login    + user exists   → 200 (signs in)
+        mode=register + user missing  → 200 (creates user)
+        mode=register + user exists   → 409 "account already exists"
     """
     provider = (payload.get("provider") or "").strip().lower()[:32] or "oauth"
     email = (payload.get("email") or "").strip().lower()
     display_name = (payload.get("display_name") or "").strip()[:80]
+    mode = (payload.get("mode") or "").strip().lower()
+    if mode not in ("login", "register"):
+        raise HTTPException(400, "mode must be 'login' or 'register'")
     if not EMAIL_RE.match(email):
         raise HTTPException(400, "invalid email")
+
     user = session.exec(select(User).where(User.email == email)).first()
-    if user is None:
-        user = User(
-            email=email,
-            password_hash="",
-            auth_provider=provider,
-            display_name=display_name,
-        )
-        session.add(user)
-        session.commit()
-        session.refresh(user)
-    else:
-        # First sign-in via this provider for an email that previously
-        # registered another way: don't overwrite their password, just stamp
-        # the most recent provider so the UI shows the right pill.
+
+    if mode == "login":
+        if user is None:
+            raise HTTPException(
+                404,
+                f"No account found for {email}. Use the Register page to create one.",
+            )
+        # Existing user: don't overwrite their stored creds, just stamp the
+        # provider on first sign-in via this path so the UI shows the right
+        # pill. Keep their original password if they had one.
         if display_name and not user.display_name:
             user.display_name = display_name
         if not user.auth_provider:
             user.auth_provider = provider
         session.add(user)
         session.commit()
+        token = create_token(user.id)
+        return AuthResponse(token=token, user=_user_dict(user))
+
+    # mode == "register"
+    if user is not None:
+        raise HTTPException(
+            409,
+            f"An account with {email} already exists. Sign in instead.",
+        )
+    user = User(
+        email=email,
+        password_hash="",
+        auth_provider=provider,
+        display_name=display_name,
+    )
+    session.add(user)
+    session.commit()
+    session.refresh(user)
     token = create_token(user.id)
     return AuthResponse(token=token, user=_user_dict(user))
 
