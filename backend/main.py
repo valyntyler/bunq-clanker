@@ -1219,33 +1219,37 @@ async def sentiment_stream(
 
             posts: list[Post] = []
 
+            # Reddit: 16 per sub × 3 subs = 48 (was 24).
             emit("reddit", "running")
             try:
-                rp = fetch_reddit(t, per_sub=8)
+                rp = fetch_reddit(t, per_sub=16)
                 posts.extend(rp)
                 emit("reddit", "done", {"count": len(rp)})
             except Exception as e:  # noqa: BLE001
                 emit("reddit", "error", {"message": str(e)})
 
+            # StockTwits: 50 (was 25).
             emit("stocktwits", "running")
             try:
-                sp = fetch_stocktwits(t, limit=25)
+                sp = fetch_stocktwits(t, limit=50)
                 posts.extend(sp)
                 emit("stocktwits", "done", {"count": len(sp)})
             except Exception as e:  # noqa: BLE001
                 emit("stocktwits", "error", {"message": str(e)})
 
+            # Hacker News: 24 (was 12).
             emit("hackernews", "running")
             try:
-                hp = fetch_hackernews(t, company_name=company_name, limit=12)
+                hp = fetch_hackernews(t, company_name=company_name, limit=24)
                 posts.extend(hp)
                 emit("hackernews", "done", {"count": len(hp)})
             except Exception as e:  # noqa: BLE001
                 emit("hackernews", "error", {"message": str(e)})
 
+            # News wires: 40 (was 20). Both ticker- and name-targeted queries.
             emit("news", "running")
             try:
-                items = fetch_news(f'"{company_name}" OR {t}', limit=20)
+                items = fetch_news(f'"{company_name}" OR {t}', limit=40)
                 for it in items:
                     posts.append(
                         Post(
@@ -1263,9 +1267,41 @@ async def sentiment_stream(
             except Exception as e:  # noqa: BLE001
                 emit("news", "error", {"message": str(e)})
 
-            # Cap the corpus so the Claude call doesn't drown.
+            # YouTube: top 10 video titles + descriptions for the ticker.
+            # The framing alone is sentiment signal — 'X is going to crash'
+            # vs 'why X is the next big thing' read very differently.
+            emit("youtube", "running")
+            try:
+                from backend.scrapers.geopolitical_clips import yt_dlp_search
+                yt_query = f"{company_name} {t} stock"
+                results = yt_dlp_search(yt_query, max_results=10)
+                yt_count = 0
+                for r in results:
+                    title = (r.get("title") or "").strip()
+                    if not title:
+                        continue
+                    desc = (r.get("description") or "").strip()[:600]
+                    posts.append(
+                        Post(
+                            source="youtube",
+                            subforum=r.get("channel") or "youtube",
+                            title=title,
+                            body=desc,
+                            url=r.get("url") or "",
+                            author=r.get("channel") or "youtube",
+                            posted_at=(r.get("upload_date") or "")[:10],
+                            score=int(r.get("view_count") or 0) // 1000,
+                        )
+                    )
+                    yt_count += 1
+                emit("youtube", "done", {"count": yt_count})
+            except Exception as e:  # noqa: BLE001
+                emit("youtube", "error", {"message": str(e)})
+
+            # Cap the corpus high enough to feel meaningful but bounded
+            # so the Claude call doesn't drown. Was 60 → 120.
             posts.sort(key=lambda p: p.score, reverse=True)
-            capped = posts[:60]
+            capped = posts[:120]
 
             emit("analyze", "running", {"posts": len(capped)})
             result = analyze_social_sentiment(t, company_name, capped)
@@ -1384,13 +1420,15 @@ async def receipts_split_request(
             continue
         description = f"{name}'s share of {merchant} · sauron split"
         try:
-            rid = await asyncio.to_thread(
+            res = await asyncio.to_thread(
                 bunq_i.request_payment_from_email, email, amount, description, user
             )
             results.append({
                 "name": name, "email": email,
                 "amount_eur": round(amount, 2),
-                "request_id": rid, "error": None,
+                "request_id": res.get("request_id"),
+                "share_url": res.get("share_url"),
+                "error": None,
             })
         except Exception as e:  # noqa: BLE001
             log.warning("split request failed for %s: %s", email, e)

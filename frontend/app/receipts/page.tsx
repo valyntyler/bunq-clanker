@@ -1060,7 +1060,7 @@ function SplitTab({ r }: { r: ReceiptResult }) {
               {splitResult.results.map((r2, i) => (
                 <li
                   key={i}
-                  className="flex items-baseline justify-between gap-2"
+                  className="flex flex-wrap items-baseline justify-between gap-2"
                 >
                   <span>
                     {r2.name}{" "}
@@ -1071,8 +1071,25 @@ function SplitTab({ r }: { r: ReceiptResult }) {
                       ✗ {r2.error}
                     </span>
                   ) : (
-                    <span style={{ color: "var(--bunq-green)" }}>
-                      request #{r2.request_id}
+                    <span className="flex flex-wrap items-baseline gap-2">
+                      <span style={{ color: "var(--bunq-green)" }}>
+                        ✓ Bunq request #{r2.request_id}
+                      </span>
+                      {r2.share_url && (
+                        <a
+                          href={r2.share_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="rounded-full px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.16em]"
+                          style={{
+                            background: "var(--bunq-green-soft)",
+                            color: "var(--bunq-green)",
+                            border: "1px solid rgba(181,255,0,0.30)",
+                          }}
+                        >
+                          tap to pay ↗
+                        </a>
+                      )}
                     </span>
                   )}
                 </li>

@@ -755,6 +755,9 @@ export interface SplitResult {
     email: string;
     amount_eur: number;
     request_id: string | null;
+    /** bunq.me tap-to-pay share URL if Bunq returned one — clickable
+     *  link the recipient can use to settle the request. */
+    share_url: string | null;
     error: string | null;
   }[];
 }
@@ -977,7 +980,7 @@ export async function streamNewsroom(args: {
 export type SentimentStance = "bullish" | "bearish" | "neutral";
 
 export interface SentimentPost {
-  source: "reddit" | "stocktwits" | "hackernews" | "news";
+  source: "reddit" | "stocktwits" | "hackernews" | "news" | "youtube";
   subforum: string;
   title: string;
   body: string;
@@ -1018,7 +1021,13 @@ export interface SentimentResult {
 export type SentimentStepStatus = "running" | "done" | "error";
 
 export interface SentimentStepEvent {
-  step: "reddit" | "stocktwits" | "hackernews" | "news" | "analyze";
+  step:
+    | "reddit"
+    | "stocktwits"
+    | "hackernews"
+    | "news"
+    | "youtube"
+    | "analyze";
   status: SentimentStepStatus;
   detail?: Record<string, unknown>;
 }

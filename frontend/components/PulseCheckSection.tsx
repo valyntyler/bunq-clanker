@@ -11,25 +11,28 @@ import {
   type SentimentStepEvent,
 } from "@/lib/api";
 
-const SOURCE_LABEL: Record<SentimentPost["source"], string> = {
+const SOURCE_LABEL: Record<string, string> = {
   reddit: "Reddit",
   stocktwits: "StockTwits",
   hackernews: "Hacker News",
   news: "News wires",
+  youtube: "YouTube",
 };
 
-const SOURCE_DOT: Record<SentimentPost["source"], string> = {
+const SOURCE_DOT: Record<string, string> = {
   reddit: "#ff4500",
   stocktwits: "#5ac8fa",
   hackernews: "#ff8a4c",
   news: "#b388ff",
+  youtube: "#ff0000",
 };
 
 const STAGE_LABEL: Record<string, string> = {
-  reddit: "Scanning Reddit (wsb / stocks / investing)",
-  stocktwits: "Reading StockTwits",
-  hackernews: "Searching Hacker News",
-  news: "Aggregating news headlines",
+  reddit: "Scanning Reddit (wsb / stocks / investing) · 16/sub",
+  stocktwits: "Reading StockTwits · top 50",
+  hackernews: "Searching Hacker News · top 24",
+  news: "Aggregating news headlines · 40",
+  youtube: "Pulling YouTube video framing · top 10",
   analyze: "Claude sentiment analysis",
 };
 
@@ -38,6 +41,7 @@ const STAGES: SentimentStepEvent["step"][] = [
   "stocktwits",
   "hackernews",
   "news",
+  "youtube",
   "analyze",
 ];
 

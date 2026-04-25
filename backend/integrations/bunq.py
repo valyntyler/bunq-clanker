@@ -125,7 +125,11 @@ def request_payment_from_email(
     amount_eur: float,
     description: str,
     user: Any | None = None,
-) -> str:
+) -> dict:
+    """Fire a Bunq sandbox request-inquiry (the real API path, not a stub).
+    Returns {request_id, share_url?} — share_url is the bunq.me tap-to-pay
+    link if Bunq returned one, so the frontend can surface a clickable
+    'pay this request' chip per recipient."""
     creds = _resolve(user)
     c = _client_for(creds.api_key)
     resp = c.post(
@@ -137,10 +141,34 @@ def request_payment_from_email(
             "allow_bunqme": True,
         },
     )
+    request_id = "?"
     for item in resp:
         if "Id" in item:
-            return str(item["Id"]["id"])
-    return "?"
+            request_id = str(item["Id"]["id"])
+            break
+
+    # Follow-up GET to fetch the bunqme_share_url so we can return a
+    # clickable link to the caller. Best-effort — failure is fine.
+    share_url: str | None = None
+    if request_id != "?":
+        try:
+            detail = c.get(
+                f"user/{creds.user_id}/monetary-account/{creds.main_id}"
+                f"/request-inquiry/{request_id}"
+            )
+            for item in detail:
+                ri = item.get("RequestInquiry") or {}
+                share_url = (
+                    (ri.get("bunqme_share_url"))
+                    or (ri.get("BunqmeShareUrl"))
+                    or None
+                )
+                if share_url:
+                    break
+        except Exception as e:  # noqa: BLE001
+            log.debug("could not fetch bunqme share url for %s: %s", request_id, e)
+
+    return {"request_id": request_id, "share_url": share_url}
 
 
 def fund_main_from_sugardaddy(
