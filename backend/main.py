@@ -23,7 +23,7 @@ import asyncio
 import json as _json
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response, StreamingResponse
 
@@ -1685,6 +1685,117 @@ async def scan(
         "image_bytes": stats.get("out_bytes"),
         **result,
     }
+
+
+@app.websocket("/scan/ws")
+async def scan_ws(websocket: WebSocket) -> None:
+    """Persistent WebSocket for AR-mode camera scanning.
+
+    Removes per-frame HTTP/multipart overhead so the AR loop can sustain a
+    higher cadence. Protocol:
+      - Auth: ?token=<jwt> on the URL.
+      - Client sends raw JPEG bytes per frame, optionally tagged via a
+        prior text message of the form `{"seq": <int>}` (server echoes the
+        last-seen seq back on every result so the client can drop stale
+        responses).
+      - Server replies with a JSON message per frame:
+          {event: "scan", seq, scanned_at, latency_ms, scene_summary,
+           detections, image_bytes}
+        or `{event: "error", message}` on a per-frame failure (the socket
+        stays open).
+
+    Backpressure: the server processes one frame at a time. If the client
+    sends faster than Claude can reply, intermediate frames pile up in the
+    OS recv buffer — the client should send-then-wait-for-result rather
+    than firing in a tight loop.
+    """
+    token = websocket.query_params.get("token")
+    if not token:
+        await websocket.close(code=4401, reason="missing token")
+        return
+    try:
+        user_id = decode_token(token)
+    except HTTPException:
+        await websocket.close(code=4401, reason="invalid token")
+        return
+    with Session(engine) as session:
+        user = session.exec(select(User).where(User.id == user_id)).first()
+    if user is None:
+        await websocket.close(code=4401, reason="user not found")
+        return
+
+    await websocket.accept()
+    from backend.analyzers.object_scan import scan_image
+
+    last_seq = 0
+    try:
+        while True:
+            msg = await websocket.receive()
+            if msg.get("type") == "websocket.disconnect":
+                break
+            # Optional metadata frame — sequence numbers so the client can
+            # drop stale responses without us having to track per-frame ids.
+            text = msg.get("text")
+            if text is not None:
+                try:
+                    meta = _json.loads(text)
+                except Exception:
+                    continue
+                if isinstance(meta, dict) and isinstance(meta.get("seq"), int):
+                    last_seq = meta["seq"]
+                continue
+            data = msg.get("bytes")
+            if data is None:
+                continue
+            if len(data) > 12 * 1024 * 1024:
+                await websocket.send_json(
+                    {"event": "error", "seq": last_seq, "message": "frame too large (max 12MB)"}
+                )
+                continue
+
+            t0 = datetime.now(timezone.utc)
+            try:
+                compressed, _ctype, stats = await asyncio.to_thread(compress_image, data)
+            except Exception as e:  # noqa: BLE001
+                log.warning("scan_ws: compress failed, sending raw: %s", e)
+                compressed = data
+                stats = {"out_bytes": len(data)}
+
+            try:
+                result = await asyncio.to_thread(scan_image, compressed)
+            except Exception as e:  # noqa: BLE001
+                log.exception("scan_ws: vision failed")
+                try:
+                    await websocket.send_json(
+                        {"event": "error", "seq": last_seq, "message": str(e)}
+                    )
+                except Exception:
+                    return
+                continue
+
+            try:
+                await websocket.send_json(
+                    {
+                        "event": "scan",
+                        "seq": last_seq,
+                        "scanned_at": datetime.now(timezone.utc).isoformat(),
+                        "image_bytes": stats.get("out_bytes"),
+                        "latency_ms": int(
+                            (datetime.now(timezone.utc) - t0).total_seconds() * 1000
+                        ),
+                        **result,
+                    }
+                )
+            except Exception:
+                return
+    except WebSocketDisconnect:
+        return
+    except Exception as e:  # noqa: BLE001
+        log.exception("scan_ws: unexpected error: %s", e)
+        try:
+            await websocket.close(code=1011, reason="internal error")
+        except Exception:
+            pass
 
 
 # ---- public endpoints (intentionally unauthenticated) ----------------

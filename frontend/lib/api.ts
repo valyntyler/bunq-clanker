@@ -1189,6 +1189,37 @@ export async function scanImage(file: File | Blob): Promise<ScanResult> {
   );
 }
 
+// ---- AR scan over WebSocket ---------------------------------------------
+// Persistent socket — used by /scan AR mode to drop the per-frame multipart
+// HTTP overhead. Server processes one frame at a time; client is responsible
+// for not flooding (send the next frame only after a result lands).
+
+export interface ScanWsResult extends ScanResult {
+  event: "scan";
+  seq: number;
+  latency_ms: number;
+}
+
+export interface ScanWsError {
+  event: "error";
+  seq: number;
+  message: string;
+}
+
+export type ScanWsMessage = ScanWsResult | ScanWsError;
+
+/** Open the AR scan socket. Auth is via JWT on the URL. The caller is
+ *  expected to hold the returned socket for the lifetime of AR mode and
+ *  close it on exit. */
+export function openScanSocket(): WebSocket {
+  const token =
+    typeof window !== "undefined"
+      ? window.localStorage.getItem(TOKEN_KEY) || ""
+      : "";
+  const wsUrl = BACKEND_URL.replace(/^http/i, "ws");
+  return new WebSocket(`${wsUrl}/scan/ws?token=${encodeURIComponent(token)}`);
+}
+
 // ---- live YouTube search for geopolitical clips ------------------------
 
 export interface YouTubeSearchResult {

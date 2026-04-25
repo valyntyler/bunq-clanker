@@ -3,12 +3,13 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { DataProvenance } from "@/components/DataProvenance";
+import { InvestModal } from "@/components/InvestModal";
 import {
-  invest,
   meRebalance,
   type RebalanceResponse,
   type RebalanceSignal,
   type RebalanceSuggestion,
+  type Report,
 } from "@/lib/api";
 
 const SIGNAL_PALETTE: Record<
@@ -41,10 +42,45 @@ const SIGNAL_PALETTE: Record<
   },
 };
 
+/** Build a minimal Report stub for InvestModal. The modal only reads
+ *  ticker / position_size_pct / verdict / company_name — everything else
+ *  is fine as a default. We tune position_size_pct so the modal's default
+ *  invest amount lands on the suggested delta:
+ *      default = position_size_pct/100 × 1000
+ *  → set position_size_pct = clamp(delta / 10, 0, 10). */
+function buildStubReport(s: RebalanceSuggestion): Report {
+  const sizePct = Math.max(
+    0,
+    Math.min(10, Math.round((s.suggested_delta_eur / 10) * 10) / 10)
+  );
+  return {
+    ticker: s.ticker,
+    company_name: s.company_name || s.ticker,
+    generated_at: new Date().toISOString(),
+    verdict: s.verdict ?? "HOLD",
+    confidence: s.verdict_confidence ?? 0.5,
+    position_size_pct: sizePct,
+    one_liner: s.rationale,
+    sections: {},
+    geopolitical_overlays: [],
+    user_sources: [],
+    bunq_spending_overlay: null,
+    consumer_panel_forecast: null,
+    location_context: { used: false, detected_at: null, coords: null },
+    risks: [],
+    conflicts: [],
+    data_gaps: [],
+    citations: [],
+    index_options: [],
+    disclaimer: "",
+  };
+}
+
 export function RebalanceSection() {
   const [data, setData] = useState<RebalanceResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [investing, setInvesting] = useState<RebalanceSuggestion | null>(null);
 
   async function reload() {
     setLoading(true);
@@ -130,44 +166,35 @@ export function RebalanceSection() {
           <RebalanceRow
             key={s.ticker}
             s={s}
-            onInvested={() => void reload()}
+            onChooseAmount={() => setInvesting(s)}
           />
         ))}
       </ul>
+
+      {investing && (
+        <InvestModal
+          report={buildStubReport(investing)}
+          open={true}
+          onClose={() => {
+            setInvesting(null);
+            // Refresh on close in case they invested — modal doesn't fire
+            // a callback, so re-pulling the rebalance data covers it.
+            void reload();
+          }}
+        />
+      )}
     </section>
   );
 }
 
 function RebalanceRow({
   s,
-  onInvested,
+  onChooseAmount,
 }: {
   s: RebalanceSuggestion;
-  onInvested: () => void;
+  onChooseAmount: () => void;
 }) {
   const palette = SIGNAL_PALETTE[s.signal];
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [done, setDone] = useState<{ amount: number; potName?: string | null } | null>(null);
-
-  async function fire() {
-    if (s.suggested_delta_eur <= 0) return;
-    setPending(true);
-    setError(null);
-    try {
-      const receipt = await invest(s.ticker, s.suggested_delta_eur);
-      setDone({
-        amount: receipt.amount_eur,
-        potName: receipt.bunq_pot_name,
-      });
-      onInvested();
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setPending(false);
-    }
-  }
-
   return (
     <li
       className="rounded-2xl p-3"
@@ -237,42 +264,21 @@ function RebalanceRow({
         {s.rationale}
       </p>
 
-      {/* Action zone */}
-      {done ? (
-        <div
-          className="mt-3 flex items-center gap-2 rounded-xl px-3 py-2 font-mono text-[10px] uppercase tracking-[0.16em]"
-          style={{
-            background: "var(--bunq-green-soft)",
-            color: "var(--bunq-green)",
-            border: "1px solid rgba(181,255,0,0.30)",
-          }}
-        >
-          ✓ €{done.amount.toFixed(2)} into {done.potName ?? `${s.ticker} pot`}
-        </div>
-      ) : s.signal === "underweight" && s.suggested_delta_eur > 0 ? (
+      {s.signal === "underweight" && s.suggested_delta_eur > 0 ? (
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-          {error ? (
-            <span className="font-mono text-[10px] text-[var(--bunq-bad)]">
-              {error}
-            </span>
-          ) : (
-            <span className="font-mono text-[10px] text-[var(--bunq-faint)]">
-              suggested rebalance ·{" "}
-              <span style={{ color: palette.fg }}>
-                +€{Math.round(s.suggested_delta_eur).toLocaleString()}
-              </span>{" "}
-              to match your wallet
-            </span>
-          )}
+          <span className="font-mono text-[10px] text-[var(--bunq-faint)]">
+            suggested rebalance ·{" "}
+            <span style={{ color: palette.fg }}>
+              +€{Math.round(s.suggested_delta_eur).toLocaleString()}
+            </span>{" "}
+            to match your wallet
+          </span>
           <button
-            onClick={() => void fire()}
-            disabled={pending}
-            className="bunq-glow rounded-full px-4 py-1.5 font-mono text-[10px] uppercase tracking-[0.16em] disabled:opacity-60"
+            onClick={onChooseAmount}
+            className="bunq-glow rounded-full px-4 py-1.5 font-mono text-[10px] uppercase tracking-[0.16em]"
             style={{ background: "var(--bunq-green)", color: "#0a0d05" }}
           >
-            {pending
-              ? "Investing…"
-              : `Invest €${Math.round(s.suggested_delta_eur).toLocaleString()} ↗`}
+            Choose amount · invest ↗
           </button>
         </div>
       ) : s.signal === "overweight" ? (

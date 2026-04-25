@@ -5,9 +5,11 @@ import { useEffect, useRef, useState } from "react";
 import { AuthGuard } from "@/components/AuthGuard";
 import { DataProvenance } from "@/components/DataProvenance";
 import {
+  openScanSocket,
   scanImage,
   type ScanDetection,
   type ScanResult,
+  type ScanWsMessage,
   type WalletSignal,
 } from "@/lib/api";
 
@@ -33,7 +35,10 @@ interface ArHit {
   box: { x: number; y: number; w: number; h: number } | null;
 }
 
-const AR_FRAME_INTERVAL_MS = 1500;
+// Minimum gap between successive frame sends — keeps the camera from sending
+// near-identical frames while a Claude call is already in flight, AND gives
+// the UI a beat to render the result before the next round.
+const AR_MIN_FRAME_GAP_MS = 250;
 const AR_HIT_TTL_MS = 7000; // detections fade out N ms after their last refresh
 const AR_STALE_AFTER_MS = 2000; // boxes "age" visually after this long without a refresh
 const AR_MIN_CONFIDENCE = 0.6;  // hide flaky / hallucinated brands from the HUD
@@ -58,13 +63,15 @@ function ScanPage() {
 
   // AR-mode state: ticker → detection (fading window).
   const [arHits, setArHits] = useState<Record<string, ArHit>>({});
-  const arBusyRef = useRef(false); // skip new captures while one's in flight
-  const arTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const arInflightRef = useRef<AbortController | null>(null);
-  // Track the resolution of the last frame we ACTUALLY sent to Claude so the
-  // returned box coords are scaled against that exact frame, not whatever
-  // the live video resolution happens to be by the time the response lands.
-  const arFrameDimsRef = useRef<{ w: number; h: number } | null>(null);
+  // WebSocket scan path. Frame N is sent only after the result for frame N-1
+  // has come back, so the server stays single-flight and we never queue stale
+  // frames that the user has already moved past.
+  const arSocketRef = useRef<WebSocket | null>(null);
+  const arSocketReadyRef = useRef(false);
+  const arSeqRef = useRef(0);
+  const arInFlightRef = useRef(false);
+  const arLastSentAtRef = useRef(0);
+  const arPendingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [arBackendBusy, setArBackendBusy] = useState(false);
   const [arError, setArError] = useState<string | null>(null);
   // Re-render every second so TTL-based fading is reactive even when no
@@ -133,99 +140,165 @@ function ScanPage() {
       v.srcObject = null;
     }
     setLiveOn(false);
-    if (arTimerRef.current) {
-      clearInterval(arTimerRef.current);
-      arTimerRef.current = null;
-    }
-    arBusyRef.current = false;
+    closeArSocket();
     setArHits({});
     setArError(null);
   }
 
-  // ---- AR mode: throttled continuous capture loop ----
+  function closeArSocket() {
+    if (arPendingTimerRef.current) {
+      clearTimeout(arPendingTimerRef.current);
+      arPendingTimerRef.current = null;
+    }
+    const s = arSocketRef.current;
+    arSocketRef.current = null;
+    arSocketReadyRef.current = false;
+    arInFlightRef.current = false;
+    setArBackendBusy(false);
+    if (s && s.readyState <= 1) {
+      try {
+        s.close(1000);
+      } catch {
+        // ignore
+      }
+    }
+  }
+
+  // ---- AR mode: WebSocket-based continuous capture loop ----
+  // We hold one socket open for the whole AR session and pipeline frames
+  // through it: send frame N → wait for the result → send frame N+1.
+  // No HTTP/multipart/JWT-decode overhead per frame; the AR HUD updates as
+  // fast as Claude vision can answer (typically 600-1200ms end-to-end).
   useEffect(() => {
     if (mode !== "ar" || !liveOn) {
-      if (arTimerRef.current) {
-        clearInterval(arTimerRef.current);
-        arTimerRef.current = null;
-      }
+      closeArSocket();
       return;
     }
 
-    async function tick() {
-      if (arBusyRef.current) return;
-      const v = videoRef.current;
-      if (!v || v.videoWidth === 0) return;
-      arBusyRef.current = true;
-      setArBackendBusy(true);
-
-      // Abort any prior request that's somehow still hanging.
-      arInflightRef.current?.abort();
-      const controller = new AbortController();
-      arInflightRef.current = controller;
-
-      try {
-        const w = v.videoWidth;
-        const h = v.videoHeight;
-        arFrameDimsRef.current = { w, h };
-        const canvas = document.createElement("canvas");
-        canvas.width = w;
-        canvas.height = h;
-        const ctx = canvas.getContext("2d");
-        if (!ctx) return;
-        ctx.drawImage(v, 0, 0, w, h);
-        const blob = await new Promise<Blob | null>((resolve) =>
-          canvas.toBlob(resolve, "image/jpeg", 0.7),
-        );
-        if (!blob || controller.signal.aborted) return;
-        const r = await scanImage(
-          new File([blob], "ar.jpg", { type: "image/jpeg" }),
-        );
-        if (controller.signal.aborted) return;
-        setArError(null);
-        const now = Date.now();
-        setArHits((prev) => {
-          const next = { ...prev };
-          // Track which tickers landed in this response — used to drop ones
-          // we previously had but didn't see this round (after a grace TTL).
-          const seen = new Set<string>();
-          for (const d of r.detections) {
-            if (!d.is_listed || !d.ticker) continue;
-            if (d.confidence < AR_MIN_CONFIDENCE) continue;
-            if (!d.box) continue; // AR HUD strictly requires a box
-            seen.add(d.ticker);
-            next[d.ticker] = {
-              detection: d,
-              lastSeen: now,
-              box: d.box,
-            };
-          }
-          // Drop expired entries.
-          for (const k of Object.keys(next)) {
-            if (now - next[k].lastSeen > AR_HIT_TTL_MS) delete next[k];
-          }
-          return next;
-        });
-      } catch (e) {
-        if ((e as Error).name !== "AbortError") {
-          setArError((e as Error).message);
+    function applyResult(r: ScanResult) {
+      const now = Date.now();
+      setArHits((prev) => {
+        const next = { ...prev };
+        for (const d of r.detections) {
+          if (!d.is_listed || !d.ticker) continue;
+          if (d.confidence < AR_MIN_CONFIDENCE) continue;
+          if (!d.box) continue;
+          next[d.ticker] = { detection: d, lastSeen: now, box: d.box };
         }
-      } finally {
-        arBusyRef.current = false;
-        setArBackendBusy(false);
+        for (const k of Object.keys(next)) {
+          if (now - next[k].lastSeen > AR_HIT_TTL_MS) delete next[k];
+        }
+        return next;
+      });
+    }
+
+    function captureFrameAsBlob(): Promise<Blob | null> {
+      const v = videoRef.current;
+      if (!v || v.videoWidth === 0) return Promise.resolve(null);
+      const w = v.videoWidth;
+      const h = v.videoHeight;
+      const canvas = document.createElement("canvas");
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return Promise.resolve(null);
+      ctx.drawImage(v, 0, 0, w, h);
+      return new Promise((resolve) =>
+        canvas.toBlob(resolve, "image/jpeg", 0.7),
+      );
+    }
+
+    async function sendNextFrame() {
+      const sock = arSocketRef.current;
+      if (!sock || sock.readyState !== WebSocket.OPEN) return;
+      if (arInFlightRef.current) return;
+      // Throttle so we don't ship a near-identical frame the instant a
+      // result lands.
+      const sinceLast = Date.now() - arLastSentAtRef.current;
+      if (sinceLast < AR_MIN_FRAME_GAP_MS) {
+        if (arPendingTimerRef.current) clearTimeout(arPendingTimerRef.current);
+        arPendingTimerRef.current = setTimeout(
+          () => void sendNextFrame(),
+          AR_MIN_FRAME_GAP_MS - sinceLast,
+        );
+        return;
+      }
+      const blob = await captureFrameAsBlob();
+      if (!blob) {
+        // No usable frame yet (camera still warming up) — try again shortly.
+        arPendingTimerRef.current = setTimeout(
+          () => void sendNextFrame(),
+          200,
+        );
+        return;
+      }
+      const sock2 = arSocketRef.current;
+      if (!sock2 || sock2.readyState !== WebSocket.OPEN) return;
+      arSeqRef.current += 1;
+      const seq = arSeqRef.current;
+      try {
+        sock2.send(JSON.stringify({ seq }));
+        sock2.send(await blob.arrayBuffer());
+        arInFlightRef.current = true;
+        arLastSentAtRef.current = Date.now();
+        setArBackendBusy(true);
+      } catch (e) {
+        setArError((e as Error).message);
       }
     }
 
-    void tick();
-    arTimerRef.current = setInterval(() => void tick(), AR_FRAME_INTERVAL_MS);
-    return () => {
-      if (arTimerRef.current) {
-        clearInterval(arTimerRef.current);
-        arTimerRef.current = null;
+    const ws = openScanSocket();
+    arSocketRef.current = ws;
+    ws.binaryType = "arraybuffer";
+
+    ws.addEventListener("open", () => {
+      arSocketReadyRef.current = true;
+      setArError(null);
+      void sendNextFrame();
+    });
+    ws.addEventListener("message", (ev) => {
+      arInFlightRef.current = false;
+      setArBackendBusy(false);
+      try {
+        const msg: ScanWsMessage = JSON.parse(ev.data as string);
+        if (msg.event === "scan") {
+          // Drop responses for sequences older than what we last sent —
+          // shouldn't happen in single-flight mode, but cheap guardrail.
+          if (msg.seq < arSeqRef.current) {
+            // continue and still apply (it's our most recent reply)
+          }
+          setArError(null);
+          applyResult(msg);
+        } else if (msg.event === "error") {
+          setArError(msg.message);
+        }
+      } catch (e) {
+        setArError(`bad scan response: ${(e as Error).message}`);
       }
-      arInflightRef.current?.abort();
-      arInflightRef.current = null;
+      // Pipeline: kick off the next frame as soon as this one is acked.
+      if (arSocketRef.current === ws) void sendNextFrame();
+    });
+    ws.addEventListener("error", () => {
+      setArError("scan socket error — reconnecting…");
+    });
+    ws.addEventListener("close", (ev) => {
+      arInFlightRef.current = false;
+      arSocketReadyRef.current = false;
+      setArBackendBusy(false);
+      if (arSocketRef.current === ws && mode === "ar" && liveOn) {
+        // Unexpected close while still in AR mode — let the user know.
+        setArError(
+          ev.code === 4401
+            ? "scan socket: not authenticated"
+            : `scan socket closed (${ev.code})`,
+        );
+      }
+    });
+
+    return () => {
+      closeArSocket();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, liveOn]);
 
   async function captureFromVideo() {
