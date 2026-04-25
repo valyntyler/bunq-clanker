@@ -316,7 +316,11 @@ export function useMicRecorder(opts: UseRecorderOpts): RecorderHandle {
 // ---------------------------------------------------------------------
 
 export interface TtsOptions {
-  voice?: "Joanna" | "Matthew" | "Stephen" | "Joey" | string;
+  /** Polly voice id. Default 'Ruth' — Polly's generative engine, the
+   *  most human-sounding option in 2026. Other generative-eligible
+   *  voices: 'Stephen' (en-US male), 'Matthew' (en-US male), 'Amy' (en-GB).
+   *  Any other voice falls back to the neural engine. */
+  voice?: "Ruth" | "Stephen" | "Matthew" | "Amy" | "Joanna" | "Joey" | string;
 }
 
 export function isTtsSupported(): boolean {

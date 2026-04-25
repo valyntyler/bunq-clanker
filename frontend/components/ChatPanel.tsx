@@ -2,7 +2,14 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Markdown } from "@/components/Markdown";
-import { chatStream, type ChatTurn, type Report } from "@/lib/api";
+import {
+  chatStream,
+  type ChatToolCall,
+  type ChatToolResult,
+  type ChatToolSource,
+  type ChatTurn,
+  type Report,
+} from "@/lib/api";
 import {
   isTtsSupported,
   isVoiceInputSupported,
@@ -24,6 +31,16 @@ export function ChatPanel({ report }: { report: Report }) {
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
   const [streamingText, setStreamingText] = useState("");
+  // Inline trace of tool fires that happened during the in-flight reply.
+  // Each entry pairs an announce string with optional source links once
+  // the tool returns. Cleared when streaming completes.
+  interface LiveToolStep {
+    name: string;
+    announce: string;
+    sources: ChatToolSource[];
+    done: boolean;
+  }
+  const [toolSteps, setToolSteps] = useState<LiveToolStep[]>([]);
   const bottomRef = useRef<HTMLDivElement>(null);
   // Voice state — these need to be state, not refs: the support check
   // runs after first render (only on the client, since the underlying
@@ -85,12 +102,13 @@ export function ChatPanel({ report }: { report: Report }) {
     setHistory(newHistory);
     setStreaming(true);
     setStreamingText("");
+    setToolSteps([]);
     let acc = "";
     // Streaming TTS — plays each sentence through Polly as soon as it
     // finishes generating, so audio starts ~1s after the first sentence
     // completes instead of after the full reply.
     const tts =
-      ttsOn && ttsAvail ? makeStreamingTts({ voice: "Joanna" }) : null;
+      ttsOn && ttsAvail ? makeStreamingTts({ voice: "Ruth" }) : null;
     try {
       await chatStream({
         ticker: report.ticker,
@@ -102,8 +120,34 @@ export function ChatPanel({ report }: { report: Report }) {
           setStreamingText(acc);
           tts?.onToken(t);
         },
+        onToolCall: (tc) => {
+          setToolSteps((prev) => [
+            ...prev,
+            { name: tc.name, announce: tc.announce, sources: [], done: false },
+          ]);
+        },
+        onToolResult: (tr) => {
+          setToolSteps((prev) => {
+            // Update the most-recent step with this name to 'done'.
+            const next = [...prev];
+            for (let i = next.length - 1; i >= 0; i--) {
+              if (next[i].name === tr.name && !next[i].done) {
+                next[i] = {
+                  ...next[i],
+                  sources: tr.sources || [],
+                  done: true,
+                };
+                break;
+              }
+            }
+            return next;
+          });
+        },
       });
-      setHistory([...newHistory, { role: "assistant", content: acc }]);
+      setHistory([
+        ...newHistory,
+        { role: "assistant", content: acc, tools: toolStepsRef.current.slice() },
+      ]);
       tts?.flush();
     } catch (e) {
       setHistory([
@@ -117,8 +161,16 @@ export function ChatPanel({ report }: { report: Report }) {
     } finally {
       setStreaming(false);
       setStreamingText("");
+      setToolSteps([]);
     }
   }
+
+  // Mirror toolSteps in a ref so the closure inside chatStream callbacks
+  // sees the latest list at the moment we commit the assistant turn.
+  const toolStepsRef = useRef<LiveToolStep[]>([]);
+  useEffect(() => {
+    toolStepsRef.current = toolSteps;
+  }, [toolSteps]);
 
   return (
     <section
@@ -223,7 +275,11 @@ export function ChatPanel({ report }: { report: Report }) {
 
         {streaming && (
           <Bubble
-            turn={{ role: "assistant", content: streamingText || "…" }}
+            turn={{
+              role: "assistant",
+              content: streamingText || "…",
+              tools: toolSteps,
+            }}
             streaming
           />
         )}
@@ -373,6 +429,7 @@ function Bubble({
   streaming?: boolean;
 }) {
   const isUser = turn.role === "user";
+  const tools = turn.tools ?? [];
   return (
     <div className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
       <div
@@ -394,7 +451,72 @@ function Bubble({
             style={{ background: "var(--bunq-green)" }}
           />
         )}
+        {tools.length > 0 && (
+          <div
+            className="mt-2 space-y-1 rounded-xl px-2 py-1.5"
+            style={{
+              background: "var(--bunq-surface)",
+              border: "1px solid var(--bunq-border)",
+            }}
+          >
+            {tools.map((step, i) => (
+              <ToolStepRow key={i} step={step} />
+            ))}
+          </div>
+        )}
       </div>
+    </div>
+  );
+}
+
+function ToolStepRow({
+  step,
+}: {
+  step: NonNullable<ChatTurn["tools"]>[number];
+}) {
+  return (
+    <div className="font-mono text-[10px] leading-snug">
+      <div
+        className="flex items-baseline gap-1.5"
+        style={{
+          color: step.done ? "var(--bunq-green)" : "var(--bunq-faint)",
+        }}
+      >
+        <span className={step.done ? "" : "animate-spin"}>
+          {step.done ? "✓" : "⟳"}
+        </span>
+        <span className="uppercase tracking-[0.16em]">{step.name}</span>
+        <span className="lowercase tracking-normal opacity-90">
+          · {step.announce}
+        </span>
+      </div>
+      {step.sources.length > 0 && (
+        <div className="mt-1 flex flex-wrap gap-1.5 pl-4">
+          {step.sources.map((s, j) => (
+            <a
+              key={j}
+              href={s.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="rounded-full px-2 py-0.5 text-[9px] uppercase tracking-[0.16em] transition hover:brightness-110"
+              style={{
+                background: "var(--bunq-surface-2)",
+                color: "var(--bunq-green)",
+                border: "1px solid var(--bunq-border)",
+              }}
+              title={s.title}
+            >
+              {(() => {
+                try {
+                  return new URL(s.url).hostname.replace(/^www\./, "");
+                } catch {
+                  return "source";
+                }
+              })()} ↗
+            </a>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

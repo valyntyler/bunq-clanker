@@ -726,46 +726,93 @@ def me_analyses(
 # ---- voice TTS — Amazon Polly neural for spoken replies --------------
 
 
+# Polly Generative engine voices (en-US) — sound dramatically more human
+# than Neural with breath sounds and natural inflection. Limited set vs
+# Neural, but covers the most polished personas. We try Generative first
+# and fall back to Neural if a region/voice combo doesn't support it.
+_GENERATIVE_VOICES = {"Ruth", "Stephen", "Matthew", "Amy"}
+
+
 @app.post("/voice/tts")
 async def voice_tts(payload: dict, user: User = Depends(require_user)) -> Response:
-    """Synthesise a chunk of text into mp3 via Amazon Polly Neural.
+    """Synthesise a chunk of text into mp3 via Amazon Polly.
+
+    Default engine is Polly's generative tier with voice 'Ruth' — the most
+    natural-sounding option in Polly as of 2026. Falls back automatically
+    to Neural if generative isn't available in the region or for the
+    requested voice.
 
     Body:
-        { text: str, voice?: 'Joanna' | 'Matthew' | 'Stephen' | 'Joey' | ... }
+        { text: str, voice?: str, engine?: 'generative' | 'neural' }
 
     Returns:
-        audio/mpeg bytes. The frontend plays them through an <audio>
-        element. Sentence-level chunking happens client-side so the
-        chat panel can start playback before the full reply finishes.
+        audio/mpeg bytes. Sentence-level chunking happens client-side so
+        the chat panel can start playback before the full reply finishes.
     """
     text = (payload.get("text") or "").strip()
-    voice = (payload.get("voice") or "Joanna").strip()
+    voice = (payload.get("voice") or "Ruth").strip()
+    engine_pref = (payload.get("engine") or "generative").strip().lower()
     if not text:
         raise HTTPException(400, "text required")
-    # Polly's synthesize_speech caps at 3000 chars per call; chunk if longer.
     if len(text) > 3000:
         text = text[:2999]
-    try:
-        polly = boto3.client("polly", region_name=os.environ.get("AWS_REGION", "us-east-1"))
-        resp = await asyncio.to_thread(
-            polly.synthesize_speech,
-            Engine="neural",
+
+    polly = boto3.client(
+        "polly", region_name=os.environ.get("AWS_REGION", "us-east-1")
+    )
+
+    def _synth(engine: str, vid: str) -> bytes:
+        kwargs = dict(
             OutputFormat="mp3",
             Text=text,
-            VoiceId=voice,
-            LanguageCode="en-US",
+            VoiceId=vid,
             TextType="text",
+            Engine=engine,
         )
-        audio_stream = resp.get("AudioStream")
-        if audio_stream is None:
+        # Generative engine doesn't accept LanguageCode at the call site;
+        # neural does. Setting it spuriously on generative returns a
+        # ValidationException.
+        if engine == "neural":
+            kwargs["LanguageCode"] = "en-US"
+        resp = polly.synthesize_speech(**kwargs)
+        stream = resp.get("AudioStream")
+        if stream is None:
             raise RuntimeError("Polly returned no AudioStream")
-        body = await asyncio.to_thread(audio_stream.read)
-    except HTTPException:
-        raise
-    except Exception as e:  # noqa: BLE001
-        log.exception("voice tts failed")
-        raise HTTPException(503, f"polly failed: {e}")
-    return Response(content=body, media_type="audio/mpeg")
+        return stream.read()
+
+    # Try generative first when the requested voice is known to support it.
+    # Otherwise drop straight to neural (still a clean voice, just less
+    # natural prosody).
+    last_err: Exception | None = None
+    candidates: list[tuple[str, str]] = []
+    if engine_pref == "generative" and voice in _GENERATIVE_VOICES:
+        candidates.append(("generative", voice))
+        candidates.append(("neural", "Ruth" if voice == "Ruth" else voice))
+    elif engine_pref == "generative":
+        # Voice isn't on the generative roster — try Ruth + generative,
+        # then the requested voice on neural.
+        candidates.append(("generative", "Ruth"))
+        candidates.append(("neural", voice))
+    else:
+        candidates.append(("neural", voice))
+
+    for engine, vid in candidates:
+        try:
+            body = await asyncio.to_thread(_synth, engine, vid)
+            return Response(
+                content=body,
+                media_type="audio/mpeg",
+                headers={
+                    "x-polly-engine": engine,
+                    "x-polly-voice": vid,
+                },
+            )
+        except Exception as e:  # noqa: BLE001
+            log.warning("polly %s/%s failed: %s", engine, vid, e)
+            last_err = e
+            continue
+
+    raise HTTPException(503, f"polly failed: {last_err}")
 
 
 # ---- voice transcribe — short clips for the chat-panel mic button ----
@@ -1491,46 +1538,57 @@ async def chat(req: ChatRequest, user: User = Depends(require_user)) -> ChatResp
 async def chat_stream_route(
     req: ChatRequest, user: User = Depends(require_user)
 ) -> StreamingResponse:
-    """SSE-streamed chat — emits {token: '...'} per content delta."""
+    """SSE-streamed chat with tool-use.
+
+    Events emitted:
+        {token: '...'}                              — text delta
+        {tool_call: {name, input, announce}}        — tool firing
+        {tool_result: {name, sources}}              — tool returned
+        {done: True}
+        {error: '...'}
+    """
     if not req.message.strip():
         raise HTTPException(400, "empty message")
 
-    async def event_gen():
-        try:
-            for token in chat_stream(req.report, req.history, req.message):
-                yield f"data: {_json.dumps({'token': token})}\n\n"
-            yield f"data: {_json.dumps({'done': True})}\n\n"
-        except Exception as e:  # noqa: BLE001
-            log.exception("chat_stream failed")
-            yield f"data: {_json.dumps({'error': str(e)})}\n\n"
-
-    # Run the blocking generator in a thread so we don't starve the event loop
     async def threaded_gen():
         loop = asyncio.get_event_loop()
-        queue: asyncio.Queue[str | None] = asyncio.Queue()
+        # The chat_stream generator yields dicts now; we shuttle them
+        # across the thread boundary as-is.
+        queue: asyncio.Queue[dict | None] = asyncio.Queue()
 
         def producer():
             try:
-                for token in chat_stream(req.report, req.history, req.message):
-                    asyncio.run_coroutine_threadsafe(queue.put(token), loop)
+                for ev in chat_stream(req.report, req.history, req.message):
+                    asyncio.run_coroutine_threadsafe(queue.put(ev), loop)
             except Exception as e:  # noqa: BLE001
                 asyncio.run_coroutine_threadsafe(
-                    queue.put(f"__error__:{e}"), loop
+                    queue.put({"__error__": str(e)}), loop
                 )
             finally:
                 asyncio.run_coroutine_threadsafe(queue.put(None), loop)
 
         loop.run_in_executor(None, producer)
 
+        sent_done = False
         while True:
             item = await queue.get()
             if item is None:
+                if not sent_done:
+                    yield f"data: {_json.dumps({'done': True})}\n\n"
+                return
+            if "__error__" in item:
+                yield f"data: {_json.dumps({'error': item['__error__']})}\n\n"
+                return
+            t = item.get("type")
+            if t == "token":
+                yield f"data: {_json.dumps({'token': item.get('text', '')})}\n\n"
+            elif t == "tool_call":
+                yield f"data: {_json.dumps({'tool_call': {'name': item.get('name'), 'input': item.get('input'), 'announce': item.get('announce')}})}\n\n"
+            elif t == "tool_result":
+                yield f"data: {_json.dumps({'tool_result': {'name': item.get('name'), 'sources': item.get('sources') or []}})}\n\n"
+            elif t == "done":
                 yield f"data: {_json.dumps({'done': True})}\n\n"
-                return
-            if isinstance(item, str) and item.startswith("__error__:"):
-                yield f"data: {_json.dumps({'error': item[10:]})}\n\n"
-                return
-            yield f"data: {_json.dumps({'token': item})}\n\n"
+                sent_done = True
 
     return StreamingResponse(
         threaded_gen(),

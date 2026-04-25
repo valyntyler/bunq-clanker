@@ -184,9 +184,36 @@ def chat_once(report: Report, history: list[ChatTurn], user_message: str) -> str
 
 
 def chat_stream(report: Report, history: list[ChatTurn], user_message: str):
-    """SSE-friendly streaming variant. Yields plain text chunks as Claude
-    emits them — the caller wraps each chunk into an SSE 'token' event."""
-    system = build_system_prompt(report)
+    """Streaming chat with tool-use loop.
+
+    Yields events as dicts so the SSE caller can paint progress, not just
+    text:
+        {'type': 'token',        'text': '...'}            — Claude text delta
+        {'type': 'tool_call',    'name': str,   'announce': str, 'input': dict}
+        {'type': 'tool_result',  'name': str,   'sources': list[dict]}
+        {'type': 'done'}                                   — final stop
+
+    Tools available: search_news, web_search, fetch_quote, fetch_panel_data.
+    Loop terminates when Claude stops with end_turn (no more tool calls).
+    Hard cap of 4 tool-call rounds to bound latency + cost.
+    """
+    from backend.services.chat_tools import (
+        TOOL_DEFINITIONS,
+        execute_tool,
+        ui_announce,
+    )
+
+    system = build_system_prompt(report) + (
+        "\n\n=== Live tools ===\n"
+        "When the user asks something the static report can't answer "
+        "(latest news, current price, fresh panel data, web facts), call "
+        "one of the tools. ALWAYS write a brief one-sentence message "
+        "BEFORE calling a tool ('let me check the latest news on …', "
+        "'one sec — pulling a live quote'), so the user knows why there's "
+        "a pause. AFTER the tool returns, continue the answer naturally, "
+        "weaving in the new info."
+    )
+
     messages: list[dict] = []
     for t in history:
         messages.append({"role": t.role, "content": t.content})
@@ -195,26 +222,119 @@ def chat_stream(report: Report, history: list[ChatTurn], user_message: str):
     bedrock = boto3.client("bedrock-runtime", region_name=_REGION)
     import json
 
-    resp = bedrock.invoke_model_with_response_stream(
-        modelId=_BEDROCK_MODEL,
-        contentType="application/json",
-        accept="application/json",
-        body=json.dumps(
-            {
-                "anthropic_version": "bedrock-2023-05-31",
-                "max_tokens": 800,
-                "temperature": 0.4,
-                "system": system,
-                "messages": messages,
+    for round_idx in range(4):
+        resp = bedrock.invoke_model_with_response_stream(
+            modelId=_BEDROCK_MODEL,
+            contentType="application/json",
+            accept="application/json",
+            body=json.dumps(
+                {
+                    "anthropic_version": "bedrock-2023-05-31",
+                    "max_tokens": 1200,
+                    "temperature": 0.4,
+                    "system": system,
+                    "messages": messages,
+                    "tools": TOOL_DEFINITIONS,
+                }
+            ),
+        )
+
+        # Reconstruct the assistant turn from the streamed deltas so we
+        # can echo it back as a `messages` entry on the next round.
+        assistant_blocks: list[dict] = []
+        # Per-block staging — Bedrock streams blocks one at a time.
+        cur_block: dict | None = None
+        cur_text: list[str] = []
+        cur_tool_input_json: list[str] = []
+        stop_reason: str | None = None
+
+        for ev in resp["body"]:
+            chunk = ev.get("chunk")
+            if not chunk:
+                continue
+            data = json.loads(chunk["bytes"])
+            t = data.get("type")
+            if t == "content_block_start":
+                cb = data.get("content_block") or {}
+                cur_block = {**cb}
+                cur_text = []
+                cur_tool_input_json = []
+            elif t == "content_block_delta":
+                delta = data.get("delta") or {}
+                dt = delta.get("type")
+                if dt == "text_delta":
+                    text = delta.get("text", "")
+                    cur_text.append(text)
+                    if text:
+                        yield {"type": "token", "text": text}
+                elif dt == "input_json_delta":
+                    cur_tool_input_json.append(delta.get("partial_json", ""))
+            elif t == "content_block_stop":
+                if cur_block is None:
+                    continue
+                if cur_block.get("type") == "text":
+                    assistant_blocks.append(
+                        {"type": "text", "text": "".join(cur_text)}
+                    )
+                elif cur_block.get("type") == "tool_use":
+                    raw_input = "".join(cur_tool_input_json) or "{}"
+                    try:
+                        input_obj = json.loads(raw_input)
+                    except Exception:  # noqa: BLE001
+                        input_obj = {}
+                    assistant_blocks.append(
+                        {
+                            "type": "tool_use",
+                            "id": cur_block.get("id"),
+                            "name": cur_block.get("name"),
+                            "input": input_obj,
+                        }
+                    )
+                cur_block = None
+                cur_text = []
+                cur_tool_input_json = []
+            elif t == "message_delta":
+                stop_reason = (data.get("delta") or {}).get("stop_reason")
+            elif t == "message_stop":
+                pass
+
+        # Append the assistant turn to message history.
+        messages.append({"role": "assistant", "content": assistant_blocks})
+
+        if stop_reason != "tool_use":
+            yield {"type": "done"}
+            return
+
+        # Execute every tool_use block, append tool_result back as a user turn.
+        tool_results: list[dict] = []
+        for blk in assistant_blocks:
+            if blk.get("type") != "tool_use":
+                continue
+            name = blk.get("name") or ""
+            input_obj = blk.get("input") or {}
+            yield {
+                "type": "tool_call",
+                "name": name,
+                "input": input_obj,
+                "announce": ui_announce(name, input_obj),
             }
-        ),
-    )
-    for ev in resp["body"]:
-        chunk = ev.get("chunk")
-        if not chunk:
-            continue
-        data = json.loads(chunk["bytes"])
-        if data.get("type") == "content_block_delta":
-            delta = data.get("delta", {})
-            if delta.get("type") == "text_delta":
-                yield delta.get("text", "")
+            text, meta = execute_tool(name, input_obj)
+            yield {
+                "type": "tool_result",
+                "name": name,
+                "sources": meta.get("sources", []),
+            }
+            tool_results.append(
+                {
+                    "type": "tool_result",
+                    "tool_use_id": blk.get("id"),
+                    "content": text,
+                }
+            )
+        if not tool_results:
+            yield {"type": "done"}
+            return
+        messages.append({"role": "user", "content": tool_results})
+
+    # Hard cap reached.
+    yield {"type": "done"}

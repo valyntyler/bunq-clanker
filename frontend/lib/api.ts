@@ -1276,15 +1276,46 @@ export async function resynthesize(
 export interface ChatTurn {
   role: "user" | "assistant";
   content: string;
+  /** UI-only: live tools the assistant fired during this turn. Stored on
+   *  the turn so the chat bubble keeps showing the trace after streaming
+   *  completes; ignored by the backend (which rebuilds tool_use blocks
+   *  from its own stream). */
+  tools?: {
+    name: string;
+    announce: string;
+    sources: ChatToolSource[];
+    done: boolean;
+  }[];
 }
 
-/** Streaming chat: invokes onToken with each text chunk; resolves on done. */
+export interface ChatToolCall {
+  name: string;
+  input: Record<string, unknown>;
+  announce: string;
+}
+
+export interface ChatToolSource {
+  title: string;
+  url: string;
+  published?: string;
+}
+
+export interface ChatToolResult {
+  name: string;
+  sources: ChatToolSource[];
+}
+
+/** Streaming chat: invokes onToken with each text chunk, onToolCall when
+ *  Claude fires a live-data tool, onToolResult when the result lands.
+ *  Resolves on done. */
 export async function chatStream(args: {
   ticker: string;
   report: Report;
   history: ChatTurn[];
   message: string;
   onToken: (s: string) => void;
+  onToolCall?: (tc: ChatToolCall) => void;
+  onToolResult?: (tr: ChatToolResult) => void;
   signal?: AbortSignal;
 }): Promise<void> {
   const r = await authFetch(`${BACKEND_URL}/chat/stream`, {
@@ -1317,6 +1348,8 @@ export async function chatStream(args: {
         try {
           const ev = JSON.parse(payload);
           if (typeof ev.token === "string") args.onToken(ev.token);
+          else if (ev.tool_call) args.onToolCall?.(ev.tool_call as ChatToolCall);
+          else if (ev.tool_result) args.onToolResult?.(ev.tool_result as ChatToolResult);
           if (ev.done) return;
           if (ev.error) throw new Error(ev.error);
         } catch {
