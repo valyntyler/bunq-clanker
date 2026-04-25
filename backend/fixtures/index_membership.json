@@ -1,0 +1,82 @@
+{
+  "indices": {
+    "SP500": {
+      "name": "S&P 500",
+      "region": "US",
+      "blurb": "500 largest US companies by market cap. Broad-market US-equity benchmark.",
+      "proxies": [
+        { "ticker": "SPY", "name": "SPDR S&P 500 ETF Trust", "expense_ratio_bps": 9 },
+        { "ticker": "VOO", "name": "Vanguard S&P 500 ETF", "expense_ratio_bps": 3 },
+        { "ticker": "IVV", "name": "iShares Core S&P 500 ETF", "expense_ratio_bps": 3 }
+      ],
+      "members": ["AAPL", "MSFT", "GOOGL", "AMZN", "META", "TSLA", "NVDA", "NFLX", "SBUX", "MCD", "KO", "V", "NKE"]
+    },
+    "NDX": {
+      "name": "Nasdaq-100",
+      "region": "US",
+      "blurb": "100 largest non-financial companies on Nasdaq. Tech-heavy growth basket.",
+      "proxies": [
+        { "ticker": "QQQ", "name": "Invesco QQQ Trust", "expense_ratio_bps": 20 },
+        { "ticker": "QQQM", "name": "Invesco Nasdaq-100 ETF", "expense_ratio_bps": 15 }
+      ],
+      "members": ["AAPL", "MSFT", "GOOGL", "AMZN", "META", "TSLA", "NVDA", "NFLX", "SBUX"]
+    },
+    "DJI": {
+      "name": "Dow Jones Industrial Average",
+      "region": "US",
+      "blurb": "30 large US blue chips, price-weighted. Older, narrower benchmark.",
+      "proxies": [
+        { "ticker": "DIA", "name": "SPDR Dow Jones Industrial Average ETF", "expense_ratio_bps": 16 }
+      ],
+      "members": ["AAPL", "MSFT", "V", "NKE", "MCD", "KO"]
+    },
+    "AEX": {
+      "name": "AEX (Amsterdam)",
+      "region": "NL",
+      "blurb": "25 most-traded Dutch listings. Bunq's home benchmark.",
+      "proxies": [
+        { "ticker": "IWDA.AS", "name": "iShares Core MSCI World UCITS (proxy)", "expense_ratio_bps": 20 },
+        { "ticker": "VEUR.AS", "name": "Vanguard FTSE Developed Europe UCITS", "expense_ratio_bps": 10 }
+      ],
+      "members": ["HEIA.AS", "AD.AS", "INGA.AS", "ABN.AS", "ADYEN.AS", "PHIA.AS", "UNA.AS", "PRX.AS", "TKWY.AS", "KPN.AS", "ASML.AS"]
+    },
+    "EURO_STOXX_50": {
+      "name": "EURO STOXX 50",
+      "region": "EU",
+      "blurb": "50 largest eurozone blue chips. Pan-European core.",
+      "proxies": [
+        { "ticker": "CSX5.DE", "name": "iShares EURO STOXX 50 UCITS", "expense_ratio_bps": 10 },
+        { "ticker": "EUE.AS", "name": "iShares EURO STOXX 50 UCITS (Amsterdam)", "expense_ratio_bps": 10 }
+      ],
+      "members": ["ASML.AS", "INGA.AS", "ADYEN.AS", "MC.PA", "RMS.PA", "SAP.DE", "UNA.AS"]
+    },
+    "FTSE100": {
+      "name": "FTSE 100",
+      "region": "UK",
+      "blurb": "100 largest UK-listed companies.",
+      "proxies": [
+        { "ticker": "ISF.L", "name": "iShares Core FTSE 100 UCITS", "expense_ratio_bps": 7 }
+      ],
+      "members": ["SHEL.L"]
+    },
+    "DAX": {
+      "name": "DAX 40",
+      "region": "DE",
+      "blurb": "40 largest German listings.",
+      "proxies": [
+        { "ticker": "EXS1.DE", "name": "iShares Core DAX UCITS", "expense_ratio_bps": 16 }
+      ],
+      "members": ["SAP.DE"]
+    },
+    "MSCI_WORLD": {
+      "name": "MSCI World",
+      "region": "Global",
+      "blurb": "~1,500 large/mid-cap stocks across 23 developed markets. The default 'global equity' index for ETF investors.",
+      "proxies": [
+        { "ticker": "IWDA.AS", "name": "iShares Core MSCI World UCITS (acc, EUR)", "expense_ratio_bps": 20 },
+        { "ticker": "URTH", "name": "iShares MSCI World ETF (USD)", "expense_ratio_bps": 24 }
+      ],
+      "members": ["AAPL", "MSFT", "GOOGL", "AMZN", "META", "TSLA", "NVDA", "NFLX", "SBUX", "MCD", "KO", "V", "NKE", "HEIA.AS", "AD.AS", "INGA.AS", "ABN.AS", "ADYEN.AS", "PHIA.AS", "UNA.AS", "PRX.AS", "TKWY.AS", "KPN.AS", "ASML.AS", "MC.PA", "RMS.PA", "SAP.DE", "SHEL.L"]
+    }
+  }
+}

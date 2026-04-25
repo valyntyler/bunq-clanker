@@ -1,3 +1,4 @@
+import { DataProvenance } from "@/components/DataProvenance";
 import { Term } from "@/components/Glossary";
 import { PanelChart } from "@/components/PanelChart";
 import type { ConsumerPanelForecast } from "@/lib/api";
@@ -30,13 +31,35 @@ export function PanelForecastCard({
         borderColor: "var(--bunq-border)",
       }}
     >
-      <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--bunq-green)]">
+      <div className="flex flex-wrap items-center gap-2 font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--bunq-green)]">
         <span className="rounded-full bg-[var(--bunq-green-soft)] px-2 py-0.5">
           alt-data
         </span>
         <span className="text-[var(--bunq-muted)]">
           Bunq panel · {ticker}
         </span>
+        {forecast.source === "live" ? (
+          <DataProvenance
+            kind="panel_forecast"
+            detail={`live · N=${forecast.panel_size_n.toLocaleString()}`}
+            override={{
+              label: "Bunq panel · live",
+              what: "Aggregated outflows from your Bunq sandbox accounts matched against the ticker's merchant aliases, used as an alt-data leading indicator for next-quarter revenue.",
+              source:
+                "Bunq sandbox /v1/user/{id}/monetary-account/{aid}/payment, walked across every active account.",
+              method:
+                "Counterparty + description matched (case-insensitive) against the merchant-alias list, outflows only, rolled up to monthly EUR. YoY/QoQ from rolling sums; sector-tuned panel→revenue Pearson correlation as the prior.",
+              freshness:
+                "Pulled live from the sandbox at analysis time; trailing 24 months.",
+              caveat: undefined,
+            }}
+          />
+        ) : (
+          <DataProvenance
+            kind="panel_forecast"
+            detail={`N=${forecast.panel_size_n.toLocaleString()}`}
+          />
+        )}
       </div>
 
       <div className="mt-4 flex items-end justify-between gap-4">

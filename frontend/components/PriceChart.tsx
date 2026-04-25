@@ -10,6 +10,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { DataProvenance } from "@/components/DataProvenance";
 import { chartData, type ChartDataResponse } from "@/lib/api";
 
 const PERIODS: { id: string; label: string }[] = [
@@ -52,7 +53,7 @@ function formatTick(d: string, period: string): string {
 }
 
 export function PriceChart({ ticker }: { ticker: string }) {
-  const [period, setPeriod] = useState("1y");
+  const [period, setPeriod] = useState("5y");
   const [data, setData] = useState<ChartDataResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -72,9 +73,12 @@ export function PriceChart({ ticker }: { ticker: string }) {
 
   return (
     <div>
-      <div className="flex items-center justify-between gap-2">
-        <div className="font-mono text-[9px] uppercase tracking-[0.18em] text-[var(--bunq-faint)]">
-          interactive · {data?.currency ?? "—"}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="font-mono text-[9px] uppercase tracking-[0.18em] text-[var(--bunq-faint)]">
+            interactive · {data?.currency ?? "—"}
+          </div>
+          <DataProvenance kind="price_chart" />
         </div>
         <div className="flex gap-1">
           {PERIODS.map((p) => (

@@ -89,6 +89,22 @@ app = FastAPI(title="Prospectus / Sauron Wallet", version="0.0.1")
 @app.on_event("startup")
 def _startup() -> None:
     init_db()
+    _migrate_investment_columns()
+
+
+def _migrate_investment_columns() -> None:
+    """SQLite ALTER TABLE shim — adds new columns that SQLModel.metadata.create_all
+    won't add to an existing table. Idempotent."""
+    from sqlalchemy import text
+    additions = [
+        ("bunq_pot_id", "INTEGER"),
+        ("bunq_pot_name", "VARCHAR"),
+    ]
+    with engine.begin() as conn:
+        existing = {row[1] for row in conn.exec_driver_sql("PRAGMA table_info(investment)").fetchall()}
+        for col, sql_type in additions:
+            if col not in existing:
+                conn.exec_driver_sql(f"ALTER TABLE investment ADD COLUMN {col} {sql_type}")
 
 # frontend is served from a different port in dev — allow localhost origins
 app.add_middleware(
@@ -126,6 +142,11 @@ def _haversine_m(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
 # ---- auth -------------------------------------------------------------
 
 EMAIL_RE = __import__("re").compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+# Valid periods accepted by both /trending (spark_period) and /chart-data
+# (period). Defined up here because /trending validates against it before
+# the chart endpoint is reached.
+_VALID_PERIODS = {"1d", "5d", "1mo", "3mo", "6mo", "1y", "2y", "5y", "10y", "max"}
 
 
 @app.post("/auth/register", response_model=AuthResponse)
@@ -335,14 +356,20 @@ async def trending(
     hours: int = 168,           # default 7 days
     limit: int = 12,
     include_spark: bool = True,
+    spark_period: str = "1mo",
     user: User = Depends(require_user),
     session: Session = Depends(get_session),
 ) -> dict:
     """Top tickers analyzed across all users in the last `hours` window.
 
     Returns aggregated counts plus the most-recent verdict per ticker and
-    (optionally) a 30-day daily-close sparkline from yfinance.
+    (optionally) a daily-close sparkline from yfinance over `spark_period`.
     """
+    if spark_period not in _VALID_PERIODS:
+        raise HTTPException(
+            400,
+            f"unsupported spark_period {spark_period!r}; one of {sorted(_VALID_PERIODS)}",
+        )
     from datetime import timedelta
     from sqlalchemy import func as sa_func
 
@@ -389,7 +416,7 @@ async def trending(
         async def _fetch_spark(ticker: str) -> tuple[list[float], str | None]:
             try:
                 bars, currency = await asyncio.to_thread(
-                    fetch_ohlcv, ticker, "1mo"
+                    fetch_ohlcv, ticker, spark_period
                 )
                 return [b["close"] for b in bars], currency
             except Exception:  # noqa: BLE001
@@ -403,6 +430,7 @@ async def trending(
     return {
         "as_of": datetime.now(timezone.utc).isoformat(),
         "window_hours": hours,
+        "spark_period": spark_period,
         "trending": out,
     }
 
@@ -500,6 +528,336 @@ def me_analyses(
     }
 
 
+# ---- Bunq passthrough — identity + accounts + activity ---------------
+
+
+@app.get("/me/bunq/profile")
+def me_bunq_profile(user: User = Depends(require_user)) -> dict:
+    """Live Bunq user record — display name, country, language, avatar.
+    Powers the TopBar greeting + the dashboard 'Bunq Accounts' header."""
+    try:
+        return bunq_i.get_user_profile()
+    except Exception as e:  # noqa: BLE001
+        log.exception("bunq profile failed")
+        raise HTTPException(503, f"bunq unavailable: {e}")
+
+
+@app.get("/me/bunq/accounts")
+def me_bunq_accounts(user: User = Depends(require_user)) -> dict:
+    """Every Bunq monetary account the user owns — main + every pot,
+    including the per-ticker 'Sauron · TICKER' pots created by /invest."""
+    try:
+        accounts = bunq_i.list_monetary_accounts()
+        return {
+            "accounts": accounts,
+            "summary": {
+                "count": len(accounts),
+                "total_eur": round(sum(a["balance"] for a in accounts if a.get("currency") == "EUR"), 2),
+                "ticker_pots": [a for a in accounts if a.get("is_ticker_pot")],
+            },
+        }
+    except Exception as e:  # noqa: BLE001
+        log.exception("bunq accounts failed")
+        raise HTTPException(503, f"bunq unavailable: {e}")
+
+
+@app.get("/me/bunq/activity")
+def me_bunq_activity(
+    user: User = Depends(require_user),
+    account_id: int | None = None,
+    count: int = 25,
+) -> dict:
+    """Recent Bunq payments — across all accounts when account_id is omitted,
+    otherwise scoped to a single pot. Shows up in the dashboard activity feed."""
+    try:
+        return {"payments": bunq_i.list_payments(account_id=account_id, count=min(count, 100))}
+    except Exception as e:  # noqa: BLE001
+        log.exception("bunq activity failed")
+        raise HTTPException(503, f"bunq unavailable: {e}")
+
+
+# ---- pulse-check: public-sentiment scrape + Claude analysis ----------
+
+
+@app.post("/sentiment/{ticker}/stream")
+async def sentiment_stream(
+    ticker: str,
+    payload: dict | None = None,
+    user: User = Depends(require_user),
+) -> StreamingResponse:
+    """Pulse Check — pull recent chatter for the ticker from Reddit / StockTwits
+    / Hacker News / Google News, run Claude over the merged corpus, return a
+    structured sentiment+market-impact payload.
+
+    Body (optional):
+        { company_name?: str }
+
+    SSE events:
+        {step: 'reddit'|'stocktwits'|'hackernews'|'news', status: 'running'|'done'|'error', count?: int}
+        {step: 'analyze', status: 'running'|'done'}
+        {result: {...analyzer output...}}
+    """
+    t = ticker.upper()
+    company_name = (payload or {}).get("company_name") or t
+
+    queue: asyncio.Queue[dict] = asyncio.Queue()
+    loop = asyncio.get_event_loop()
+
+    def emit(step: str, status: str, detail: dict | None = None) -> None:
+        ev: dict = {"step": step, "status": status}
+        if detail:
+            ev["detail"] = detail
+        loop.call_soon_threadsafe(queue.put_nowait, ev)
+
+    def run_pipeline() -> None:
+        try:
+            from backend.scrapers.social_sentiment import (
+                Post,
+                fetch_hackernews,
+                fetch_reddit,
+                fetch_stocktwits,
+            )
+            from backend.scrapers.news import fetch_news
+            from backend.analyzers.social_sentiment import analyze_social_sentiment
+
+            posts: list[Post] = []
+
+            emit("reddit", "running")
+            try:
+                rp = fetch_reddit(t, per_sub=8)
+                posts.extend(rp)
+                emit("reddit", "done", {"count": len(rp)})
+            except Exception as e:  # noqa: BLE001
+                emit("reddit", "error", {"message": str(e)})
+
+            emit("stocktwits", "running")
+            try:
+                sp = fetch_stocktwits(t, limit=25)
+                posts.extend(sp)
+                emit("stocktwits", "done", {"count": len(sp)})
+            except Exception as e:  # noqa: BLE001
+                emit("stocktwits", "error", {"message": str(e)})
+
+            emit("hackernews", "running")
+            try:
+                hp = fetch_hackernews(t, company_name=company_name, limit=12)
+                posts.extend(hp)
+                emit("hackernews", "done", {"count": len(hp)})
+            except Exception as e:  # noqa: BLE001
+                emit("hackernews", "error", {"message": str(e)})
+
+            emit("news", "running")
+            try:
+                items = fetch_news(f'"{company_name}" OR {t}', limit=20)
+                for it in items:
+                    posts.append(
+                        Post(
+                            source="news",
+                            subforum=it.source,
+                            title=it.title,
+                            body=it.snippet[:600],
+                            url=it.url,
+                            author=it.source,
+                            posted_at=it.published[:25],
+                            score=0,
+                        )
+                    )
+                emit("news", "done", {"count": len(items)})
+            except Exception as e:  # noqa: BLE001
+                emit("news", "error", {"message": str(e)})
+
+            # Cap the corpus so the Claude call doesn't drown.
+            posts.sort(key=lambda p: p.score, reverse=True)
+            capped = posts[:60]
+
+            emit("analyze", "running", {"posts": len(capped)})
+            result = analyze_social_sentiment(t, company_name, capped)
+            emit("analyze", "done")
+
+            asyncio.run_coroutine_threadsafe(
+                queue.put({"result": result}), loop
+            )
+        except Exception as e:  # noqa: BLE001
+            log.exception("sentiment_stream failed")
+            asyncio.run_coroutine_threadsafe(queue.put({"error": str(e)}), loop)
+        finally:
+            asyncio.run_coroutine_threadsafe(queue.put({"_done": True}), loop)
+
+    loop.run_in_executor(None, run_pipeline)
+
+    async def event_gen():
+        while True:
+            ev = await queue.get()
+            if ev.get("_done"):
+                return
+            yield f"data: {_json.dumps(ev)}\n\n"
+
+    return StreamingResponse(
+        event_gen(),
+        media_type="text/event-stream",
+        headers={"cache-control": "no-cache", "x-accel-buffering": "no"},
+    )
+
+
+# ---- receipt scan: line-item parse + per-item ticker attribution -----
+
+
+@app.post("/receipts/scan")
+async def receipts_scan(
+    file: UploadFile = File(...),
+    user: User = Depends(require_user),
+) -> dict:
+    """Parse a receipt photo into structured items + per-item publicly traded
+    parent attribution, plus a recency flag that tells the frontend whether
+    to enable the bill-split workflow."""
+    if not (file.content_type or "").startswith("image/"):
+        raise HTTPException(400, "receipts/scan accepts image/* only")
+    raw = await file.read()
+    if not raw:
+        raise HTTPException(400, "empty file")
+    if len(raw) > 12 * 1024 * 1024:
+        raise HTTPException(413, "image too large (max 12MB)")
+    try:
+        compressed, _ctype, stats = await asyncio.to_thread(compress_image, raw)
+    except Exception as e:  # noqa: BLE001
+        log.warning("receipts/scan: compress failed, using raw: %s", e)
+        compressed = raw
+        stats = {"out_bytes": len(raw)}
+
+    from backend.analyzers.receipt_scan import scan_receipt
+
+    try:
+        result = await asyncio.to_thread(scan_receipt, compressed)
+    except Exception as e:  # noqa: BLE001
+        log.exception("receipts/scan failed")
+        raise HTTPException(503, f"receipt parse failed: {e}")
+
+    return {
+        "scanned_at": datetime.now(timezone.utc).isoformat(),
+        "image_bytes": stats.get("out_bytes"),
+        **result,
+    }
+
+
+@app.post("/receipts/split/request")
+async def receipts_split_request(
+    payload: dict,
+    user: User = Depends(require_user),
+) -> dict:
+    """Fire one Bunq payment request per participant, given the per-person
+    totals computed client-side from the receipt's per-item checkboxes.
+
+    Body:
+        {
+          "merchant": "Albert Heijn",
+          "currency": "EUR",
+          "participants": [
+            { "name": "Alice", "email": "alice@example.com", "amount_eur": 12.45 },
+            ...
+          ]
+        }
+
+    Returns the per-participant request id (or error message). Sandbox: the
+    Bunq API accepts arbitrary EMAIL counterparties even when they don't
+    map to a real sandbox account — perfect for the demo.
+    """
+    merchant = (payload.get("merchant") or "").strip()[:80] or "shared bill"
+    participants = payload.get("participants") or []
+    if not isinstance(participants, list) or not participants:
+        raise HTTPException(400, "participants required")
+    if len(participants) > 10:
+        raise HTTPException(400, "max 10 participants per split")
+
+    results: list[dict] = []
+    for p in participants:
+        name = (p.get("name") or "").strip()[:40] or "friend"
+        email = (p.get("email") or "").strip()[:120]
+        amount = float(p.get("amount_eur") or 0.0)
+        if amount <= 0:
+            results.append({
+                "name": name, "email": email, "amount_eur": amount,
+                "request_id": None, "error": "amount must be > 0",
+            })
+            continue
+        if not email or "@" not in email:
+            results.append({
+                "name": name, "email": email, "amount_eur": amount,
+                "request_id": None, "error": "valid email required",
+            })
+            continue
+        description = f"{name}'s share of {merchant} · sauron split"
+        try:
+            rid = await asyncio.to_thread(
+                bunq_i.request_payment_from_email, email, amount, description
+            )
+            results.append({
+                "name": name, "email": email,
+                "amount_eur": round(amount, 2),
+                "request_id": rid, "error": None,
+            })
+        except Exception as e:  # noqa: BLE001
+            log.warning("split request failed for %s: %s", email, e)
+            results.append({
+                "name": name, "email": email,
+                "amount_eur": round(amount, 2),
+                "request_id": None, "error": str(e)[:200],
+            })
+    return {
+        "merchant": merchant,
+        "currency": (payload.get("currency") or "EUR").strip()[:6],
+        "sent_at": datetime.now(timezone.utc).isoformat(),
+        "results": results,
+    }
+
+
+# ---- camera scan: image → product → company → ticker ----------------
+
+
+@app.post("/scan")
+async def scan(
+    file: UploadFile = File(...),
+    user: User = Depends(require_user),
+) -> dict:
+    """User opens phone camera, snaps a photo, we run Claude vision to
+    identify branded products → publicly listed parent companies → tickers.
+    Returns a list of detections each with an investment-take line and a
+    confidence score; the frontend renders these as clickable cards that
+    deep-link to /analyze/{ticker}.
+
+    Accepts image/* (JPEG/PNG/WebP). Videos: client samples a frame and
+    posts that frame as an image — keeps this endpoint focused.
+    """
+    if not (file.content_type or "").startswith("image/"):
+        raise HTTPException(400, "scan accepts image/* only — sample a video frame client-side")
+    raw = await file.read()
+    if not raw:
+        raise HTTPException(400, "empty file")
+    if len(raw) > 12 * 1024 * 1024:
+        raise HTTPException(413, "image too large (max 12MB)")
+
+    # Compress aggressively so we don't waste vision tokens on a 10MP photo.
+    try:
+        compressed, _ctype, stats = await asyncio.to_thread(compress_image, raw)
+    except Exception as e:  # noqa: BLE001
+        log.warning("scan: compress failed, sending raw: %s", e)
+        compressed = raw
+        stats = {"in_bytes": len(raw), "out_bytes": len(raw), "ratio": 1.0}
+
+    from backend.analyzers.object_scan import scan_image
+
+    try:
+        result = await asyncio.to_thread(scan_image, compressed)
+    except Exception as e:  # noqa: BLE001
+        log.exception("scan: vision analysis failed")
+        raise HTTPException(503, f"vision analysis failed: {e}")
+
+    return {
+        "scanned_at": datetime.now(timezone.utc).isoformat(),
+        "image_bytes": stats.get("out_bytes"),
+        **result,
+    }
+
+
 # ---- public endpoints (intentionally unauthenticated) ----------------
 
 
@@ -543,11 +901,16 @@ async def analyze_stream_route(
                 ticker_upper, coords=coords, location_label=location_label
             ):
                 yield f"data: {_json.dumps(ev)}\n\n"
-                # Cache the final report so navigate-back hydrates instantly.
+                # Cache the final report so navigate-back hydrates instantly,
+                # and append an AnalysisRun row so the dashboard's "Recent
+                # analyses" / cross-user trending feed populates. Without
+                # this, only the rarely-hit non-streaming /analyze path
+                # would ever add to AnalysisRun and the dashboard sat empty.
                 if ev.get("event") == "report":
                     try:
                         report_obj = Report(**ev["report"])
                         _persist_cached_report(session, user, report_obj)
+                        _persist_analysis_run(session, user, report_obj)
                     except Exception:  # noqa: BLE001
                         log.exception("failed to cache stream report (non-fatal)")
         except Exception as e:  # noqa: BLE001
@@ -683,7 +1046,14 @@ async def resynthesize(
         risks=synth.get("risks", []),
         conflicts=synth.get("conflicts", []),
         data_gaps=synth.get("data_gaps", []),
+        index_options=_memberships_for(req.ticker),
     )
+
+
+def _memberships_for(ticker: str) -> list:
+    """Lazy import to avoid loading the fixture on every cold start of unrelated routes."""
+    from backend.analyzers.index_membership import memberships_for
+    return memberships_for(ticker)
 
 
 MAX_UPLOAD_BYTES = {
@@ -971,6 +1341,26 @@ async def evidence(
     return src
 
 
+def _persist_analysis_run(session: Session, user: User, report: Report) -> None:
+    """Append a Recent-analyses row for the dashboard. Best-effort."""
+    try:
+        session.add(
+            AnalysisRun(
+                user_id=user.id,
+                ticker=report.ticker,
+                company_name=report.company_name,
+                verdict=report.verdict,
+                confidence=report.confidence,
+                position_size_pct=report.position_size_pct,
+                one_liner=report.one_liner,
+            )
+        )
+        session.commit()
+    except Exception:  # noqa: BLE001
+        log.exception("failed to persist AnalysisRun (non-fatal)")
+        session.rollback()
+
+
 def _persist_cached_report(session: Session, user: User, report: Report) -> None:
     """Replace the cached report for (user, ticker). Best-effort — never
     blocks the user-visible response on persistence."""
@@ -1053,22 +1443,7 @@ async def analyze(
     report = await analyze_async(
         ticker_upper, coords=coords, location_label=location_label
     )
-    try:
-        session.add(
-            AnalysisRun(
-                user_id=user.id,
-                ticker=report.ticker,
-                company_name=report.company_name,
-                verdict=report.verdict,
-                confidence=report.confidence,
-                position_size_pct=report.position_size_pct,
-                one_liner=report.one_liner,
-            )
-        )
-        session.commit()
-    except Exception:  # noqa: BLE001
-        log.exception("failed to persist AnalysisRun (non-fatal)")
-        session.rollback()
+    _persist_analysis_run(session, user, report)
     _persist_cached_report(session, user, report)
     return report
 
@@ -1171,9 +1546,6 @@ def panel(
         raise HTTPException(404, f"no panel data for ticker {ticker}")
 
 
-_VALID_PERIODS = {"1d", "5d", "1mo", "3mo", "6mo", "1y", "2y", "5y", "10y", "max"}
-
-
 @app.get("/chart-data/{ticker}")
 async def chart_data(
     ticker: str,
@@ -1204,21 +1576,61 @@ async def panel_data(
 ) -> dict:
     """Monthly panel spend series for the interactive Bunq panel chart.
 
-    Returns 24 months of {month, spend_eur, prior_year_spend_eur}.
+    Returns 24 months of {month, spend_eur, prior_year_eur}. Prefers live
+    Bunq sandbox aggregation; falls back to the simulated fixture only
+    when the live data is too thin (matched_count < PANEL_LIVE_MIN_MATCHES,
+    default 4).
     """
-    import json
+    import json as _json_local
+    import os as _os_local
     from pathlib import Path
 
-    fixture = (
-        Path(__file__).parent / "fixtures" / "panel_spend.json"
-    )
-    if not fixture.exists():
-        raise HTTPException(404, "panel fixture missing")
-    data = json.loads(fixture.read_text())
-    entry = data.get(ticker.upper())
-    if not entry:
+    from backend.analyzers.consumer_panel import LIVE_MIN_MATCHES
+
+    t = ticker.upper()
+
+    # 1) Try live Bunq aggregation
+    aliases_path = Path(__file__).parent / "fixtures" / "merchant_aliases.json"
+    aliases: list[str] = []
+    if aliases_path.exists():
+        aliases = _json_local.loads(aliases_path.read_text()).get(t, [])
+    live_months: dict[str, float] = {}
+    live_n = 0
+    matched_count = 0
+    if aliases:
+        try:
+            agg = await asyncio.to_thread(bunq_i.aggregate_panel, aliases, 24)
+            if agg["matched_count"] >= LIVE_MIN_MATCHES:
+                live_months = agg["months"]
+                live_n = agg["panel_size_n"]
+                matched_count = agg["matched_count"]
+        except Exception as e:  # noqa: BLE001
+            log.warning("panel-data live aggregation failed: %s", e)
+
+    # 2) Load fixture (always used for prior-year baseline + zero-fill fallback)
+    fixture_path = Path(__file__).parent / "fixtures" / "panel_spend.json"
+    fixture_entry = None
+    if fixture_path.exists():
+        fixture_entry = _json_local.loads(fixture_path.read_text()).get(t)
+
+    if not live_months and not fixture_entry:
         raise HTTPException(404, f"no panel data for {ticker}")
-    months = entry["months"]
+
+    months: dict[str, float]
+    panel_size_n: int
+    source: str
+    if live_months:
+        months = {**(fixture_entry["months"] if fixture_entry else {})}
+        for k, v in live_months.items():
+            if v > 0:
+                months[k] = v
+        panel_size_n = live_n
+        source = "live"
+    else:
+        months = fixture_entry["months"]
+        panel_size_n = fixture_entry["panel_size_n"]
+        source = "simulated"
+
     sorted_keys = sorted(months.keys())
     series: list[dict] = []
     for k in sorted_keys:
@@ -1231,8 +1643,10 @@ async def panel_data(
             }
         )
     return {
-        "ticker": ticker.upper(),
-        "panel_size_n": entry["panel_size_n"],
+        "ticker": t,
+        "panel_size_n": panel_size_n,
+        "source": source,
+        "matched_count": matched_count,
         "series": series,
     }
 
@@ -1274,18 +1688,23 @@ def invest(
     if req.amount_eur > 10_000:
         raise HTTPException(400, "amount capped at €10,000 in sandbox")
 
-    # 1+2: ensure funds, then transfer Main -> Pot
+    # 1+2: ensure funds, ensure a per-ticker pot exists, then transfer Main -> that pot
+    ticker_up = req.ticker.upper()
+    pot_name = f"Sauron · {ticker_up}"
     try:
         bal = bunq_i.get_balance()
         if bal["main"] < req.amount_eur:
             needed = req.amount_eur - bal["main"]
             bunq_i.fund_main_from_sugardaddy(
                 max(needed, 50.0),
-                description=f"prospectus top-up for {req.ticker}",
+                description=f"sauron top-up for {ticker_up}",
             )
-        bunq_payment_id = bunq_i.transfer_main_to_pot(
+        ticker_pot_id = bunq_i.ensure_ticker_pot(ticker_up)
+        bunq_payment_id = bunq_i.transfer_main_to_account(
+            ticker_pot_id,
             req.amount_eur,
-            description=f"prospectus: {req.ticker} position",
+            description=f"sauron: {ticker_up} position",
+            name=pot_name,
         )
     except Exception as e:  # noqa: BLE001
         log.exception("bunq transfer failed")
@@ -1305,8 +1724,10 @@ def invest(
 
     receipt = InvestReceipt(
         bunq_payment_id=bunq_payment_id,
+        bunq_pot_id=ticker_pot_id,
+        bunq_pot_name=pot_name,
         alpaca_order_id=alpaca_order_id,
-        ticker=req.ticker.upper(),
+        ticker=ticker_up,
         amount_eur=req.amount_eur,
         amount_usd=round(amount_usd, 2),
         shares=shares,
@@ -1322,11 +1743,13 @@ def invest(
         session.add(
             Investment(
                 user_id=user.id,
-                ticker=req.ticker.upper(),
+                ticker=ticker_up,
                 amount_eur=req.amount_eur,
                 amount_usd=round(amount_usd, 2),
                 fx_rate=FX_EUR_USD,
                 bunq_payment_id=bunq_payment_id,
+                bunq_pot_id=ticker_pot_id,
+                bunq_pot_name=pot_name,
                 alpaca_order_id=alpaca_order_id,
                 alpaca_symbol=alpaca_symbol,
                 shares_estimated=shares,

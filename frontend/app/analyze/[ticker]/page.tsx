@@ -19,7 +19,17 @@ import {
 import { AddEvidenceModal } from "@/components/AddEvidenceModal";
 import { AuthGuard } from "@/components/AuthGuard";
 import { ChatPanel } from "@/components/ChatPanel";
+import { DataProvenance } from "@/components/DataProvenance";
+import { GeopoliticalOverlayCard } from "@/components/GeopoliticalOverlayCard";
+import { IndexOptionsSection } from "@/components/IndexOptionsSection";
 import { LiveClipSearch } from "@/components/LiveClipSearch";
+import { PulseCheckSection } from "@/components/PulseCheckSection";
+import {
+  CardSkeleton,
+  ModuleSkeleton,
+  PendingStrip,
+  VerdictSkeleton,
+} from "@/components/SectionSkeleton";
 import { Markdown } from "@/components/Markdown";
 import {
   emptyPipelineState,
@@ -48,23 +58,6 @@ function formatAge(s: number): string {
   if (s < 3600) return `${Math.round(s / 60)}m`;
   if (s < 86400) return `${Math.round(s / 3600)}h`;
   return `${Math.round(s / 86400)}d`;
-}
-
-function SubCard({ label, body }: { label: string; body: string }) {
-  return (
-    <div
-      className="rounded-xl p-2"
-      style={{
-        background: "var(--bunq-surface-2)",
-        border: "1px solid var(--bunq-border)",
-      }}
-    >
-      <div className="font-mono text-[9px] uppercase tracking-[0.18em] text-[var(--bunq-faint)]">
-        {label}
-      </div>
-      <div className="mt-1 text-xs text-[var(--bunq-text)]/85">{body}</div>
-    </div>
-  );
 }
 
 const MODULE_DISPLAY: Record<string, string> = {
@@ -447,7 +440,7 @@ function AnalyzePage() {
         </div>
       )}
 
-      {report && (
+      {report ? (
         <div className="relative">
           <VerdictBanner report={report} />
           {resynthing && (
@@ -456,14 +449,41 @@ function AnalyzePage() {
             </div>
           )}
         </div>
+      ) : (
+        pending && !err && <VerdictSkeleton ticker={ticker} />
       )}
 
-      {(panel || bunqSpending) && (
+      {/* Panel + personal-spending row. Render skeletons in the slots
+          while their analyzers are still in flight so the layout doesn't
+          jump when the data lands. */}
+      {(panel ||
+        bunqSpending ||
+        (pending &&
+          (pipeline.panel?.status !== "done" ||
+            pipeline.bunq_spending?.status !== "done"))) && (
         <div className="grid gap-4 md:grid-cols-2">
-          {panel && <PanelForecastCard forecast={panel} ticker={ticker} />}
-          {bunqSpending && (
+          {panel ? (
+            <PanelForecastCard forecast={panel} ticker={ticker} />
+          ) : pipeline.panel?.status !== "done" && pending ? (
+            <CardSkeleton
+              title="Bunq panel forecast"
+              status={
+                pipeline.panel?.status === "running" ? "running" : "pending"
+              }
+            />
+          ) : null}
+          {bunqSpending ? (
             <BunqSpendingCard overlay={bunqSpending} ticker={ticker} />
-          )}
+          ) : pipeline.bunq_spending?.status !== "done" && pending ? (
+            <CardSkeleton
+              title="Your personal spend"
+              status={
+                pipeline.bunq_spending?.status === "running"
+                  ? "running"
+                  : "pending"
+              }
+            />
+          ) : null}
         </div>
       )}
 
@@ -486,37 +506,129 @@ function AnalyzePage() {
         </div>
       )}
 
-      {Object.keys(sections).length > 0 && (
+      {report && report.index_options && report.index_options.length > 0 && (
+        <IndexOptionsSection
+          ticker={ticker}
+          options={report.index_options}
+        />
+      )}
+
+      {(Object.keys(sections).length > 0 || pending) && (
         <section>
-          <h2 className="mb-3 font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--bunq-faint)]">
-            Analyzer modules
-            {pending && (
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <h2 className="font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--bunq-faint)]">
+              Analyzer modules
+              {pending && (
+                <span
+                  className="ml-2 inline-block animate-pulse"
+                  style={{ color: "var(--bunq-green)" }}
+                >
+                  ●
+                </span>
+              )}
+            </h2>
+            <span className="text-[10px] text-[var(--bunq-muted)]">
+              one card per data modality — hover any
               <span
-                className="ml-2 inline-block animate-pulse"
-                style={{ color: "var(--bunq-green)" }}
+                className="mx-1 inline-block rounded-full px-1.5 py-0 font-mono text-[8px]"
+                style={{
+                  background: "var(--bunq-surface-2)",
+                  border: "1px solid var(--bunq-border)",
+                }}
               >
-                ●
+                data ⓘ
               </span>
-            )}
-          </h2>
+              tag for full provenance
+            </span>
+          </div>
           <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-            {Object.entries(sections).map(([name, s]) => (
-              <SectionCard
-                key={name}
-                name={name}
-                section={s}
-                ticker={ticker}
-              />
-            ))}
+            {/* Always show all six module slots: real card if the section
+                landed, skeleton otherwise. Order matches MODULE_ORDER so
+                the layout is stable as data streams in. */}
+            {[
+              "fundamentals",
+              "news",
+              "chart",
+              "website",
+              "earnings_call",
+              "leadership",
+            ].map((name) => {
+              const s = sections[name];
+              if (s) {
+                return (
+                  <SectionCard
+                    key={name}
+                    name={name}
+                    section={s}
+                    ticker={ticker}
+                  />
+                );
+              }
+              if (!pending) return null;
+              const status = pipeline[name]?.status;
+              if (status === "done") return null;
+              return (
+                <ModuleSkeleton
+                  key={name}
+                  name={name}
+                  status={
+                    status === "running"
+                      ? "running"
+                      : status === "error"
+                        ? "error"
+                        : "pending"
+                  }
+                  desc={pipeline[name]?.desc}
+                />
+              );
+            })}
+            {/* Surface any extra modules that streamed in (e.g. user_text)
+                that aren't in the canonical six-card grid above. */}
+            {Object.entries(sections)
+              .filter(([name]) =>
+                ![
+                  "fundamentals",
+                  "news",
+                  "chart",
+                  "website",
+                  "earnings_call",
+                  "leadership",
+                ].includes(name)
+              )
+              .map(([name, s]) => (
+                <SectionCard
+                  key={name}
+                  name={name}
+                  section={s}
+                  ticker={ticker}
+                />
+              ))}
           </div>
         </section>
       )}
 
+      {/* Geopolitical strip indicator while overlays are still being scored. */}
+      {pending &&
+        geoOverlays.length === 0 &&
+        pipeline.geopolitical?.status &&
+        pipeline.geopolitical.status !== "done" && (
+          <PendingStrip
+            label={
+              pipeline.geopolitical.status === "running"
+                ? "geopolitical overlays · scoring relevance"
+                : "geopolitical overlays"
+            }
+          />
+        )}
+
       {userSources.length > 0 && (
         <section>
-          <h2 className="mb-3 font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--bunq-faint)]">
-            Your sources
-          </h2>
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <h2 className="font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--bunq-faint)]">
+              Your sources
+            </h2>
+            <DataProvenance kind="user_source" detail={`${userSources.length} added`} />
+          </div>
           <div className="space-y-2">
             {userSources.map((u) => (
               <div
@@ -580,124 +692,22 @@ function AnalyzePage() {
 
       {geoOverlays.length > 0 && (
         <section>
-          <h2 className="mb-3 font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--bunq-faint)]">
-            Geopolitical overlays
-          </h2>
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <h2 className="font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--bunq-faint)]">
+              Geopolitical overlays
+            </h2>
+            <DataProvenance
+              kind="geopolitical_overlay"
+              detail={`${geoOverlays.length} matched`}
+            />
+          </div>
           <div className="space-y-3">
             {geoOverlays.map((g) => (
-              <div
+              <GeopoliticalOverlayCard
                 key={g.event_id}
-                className="overflow-hidden rounded-2xl"
-                style={{
-                  background: "var(--bunq-surface)",
-                  border: "1px solid var(--bunq-border)",
-                }}
-              >
-                <div className="grid gap-4 p-5 md:grid-cols-[260px_1fr]">
-                  {g.clip_url ? (
-                    <video
-                      src={g.clip_url}
-                      controls
-                      preload="metadata"
-                      playsInline
-                      className="aspect-video w-full rounded-xl bg-black"
-                    />
-                  ) : (
-                    <div
-                      className="flex aspect-video w-full items-center justify-center rounded-xl border border-dashed font-mono text-[10px] uppercase tracking-[0.18em]"
-                      style={{
-                        borderColor: "var(--bunq-border-strong)",
-                        color: "var(--bunq-faint)",
-                      }}
-                    >
-                      live RSS · text-only
-                    </div>
-                  )}
-                  <div>
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <div className="text-sm font-bold text-[var(--bunq-text)]">
-                          {g.speaker}
-                          {g.clip_url && (
-                            <span
-                              className="ml-2 rounded-full px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.16em]"
-                              style={{
-                                background: "var(--bunq-green-soft)",
-                                color: "var(--bunq-green)",
-                              }}
-                            >
-                              video · prosody · vision
-                            </span>
-                          )}
-                        </div>
-                        <div className="mt-0.5 font-mono text-[10px] text-[var(--bunq-faint)]">
-                          {g.event_id}
-                        </div>
-                      </div>
-                      <div className="flex flex-col items-end gap-2">
-                        <div className="text-right font-mono text-xs text-[var(--bunq-muted)]">
-                          <div className="bunq-numeral">
-                            rel {g.relevance.toFixed(2)}
-                          </div>
-                          <div className="bunq-numeral">
-                            impact{" "}
-                            {g.impact_direction > 0
-                              ? "+"
-                              : g.impact_direction < 0
-                                ? "−"
-                                : "·"}
-                            {g.impact_magnitude.toFixed(2)}
-                          </div>
-                        </div>
-                        <button
-                          onClick={() => setPreviewOverlay(g)}
-                          className="rounded-full px-2.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.16em]"
-                          style={{
-                            background: "var(--bunq-green-soft)",
-                            color: "var(--bunq-green)",
-                            border: "1px solid rgba(181,255,0,0.30)",
-                          }}
-                        >
-                          expand ↗
-                        </button>
-                      </div>
-                    </div>
-                    <Markdown
-                      text={g.reasoning}
-                      className="mt-2 text-sm text-[var(--bunq-text)]/90"
-                    />
-                    {g.source_url && (
-                      <a
-                        href={g.source_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="mt-2 inline-flex items-center gap-1 font-mono text-[10px] underline decoration-dotted"
-                        style={{ color: "var(--bunq-green)" }}
-                      >
-                        source ↗
-                      </a>
-                    )}
-                    {g.transcript_excerpt && (
-                      <blockquote
-                        className="mt-2 border-l-2 pl-3 text-xs italic text-[var(--bunq-muted)]"
-                        style={{ borderColor: "var(--bunq-border-strong)" }}
-                      >
-                        “{g.transcript_excerpt}”
-                      </blockquote>
-                    )}
-                    {(g.tone_notes || g.visual_notes) && (
-                      <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                        {g.tone_notes && (
-                          <SubCard label="tone (audio)" body={g.tone_notes} />
-                        )}
-                        {g.visual_notes && (
-                          <SubCard label="visual (frame grid)" body={g.visual_notes} />
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
+                g={g}
+                onExpand={() => setPreviewOverlay(g)}
+              />
             ))}
           </div>
         </section>
@@ -753,6 +763,10 @@ function AnalyzePage() {
             ))}
           </ul>
         </section>
+      )}
+
+      {report && (
+        <PulseCheckSection ticker={ticker} companyName={report.company_name} />
       )}
 
       {report && <ChatPanel report={report} />}

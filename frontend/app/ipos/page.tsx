@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { AuthGuard } from "@/components/AuthGuard";
 import { Markdown } from "@/components/Markdown";
+import { DataProvenance } from "@/components/DataProvenance";
 import { listIpos, type EdgarFiling, type IpoBrief } from "@/lib/api";
 
 export default function IposPage() {
@@ -79,16 +80,19 @@ function Ipos() {
           <>
             {data.recent_filings && data.recent_filings.length > 0 && (
               <section>
-                <h2 className="mb-3 flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--bunq-faint)]">
-                  <span
-                    className="inline-flex h-1.5 w-1.5 animate-pulse rounded-full"
-                    style={{ background: "var(--bunq-green)" }}
-                  />
-                  Live · just filed with SEC
-                  <span className="ml-2 normal-case text-[var(--bunq-faint)]/80">
-                    {data.recent_filings_source}
-                  </span>
-                </h2>
+                <div className="mb-3 flex flex-wrap items-center gap-2">
+                  <h2 className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--bunq-faint)]">
+                    <span
+                      className="inline-flex h-1.5 w-1.5 animate-pulse rounded-full"
+                      style={{ background: "var(--bunq-green)" }}
+                    />
+                    Live · just filed with SEC
+                    <span className="ml-2 normal-case text-[var(--bunq-faint)]/80">
+                      {data.recent_filings_source}
+                    </span>
+                  </h2>
+                  <DataProvenance kind="ipo_filings" />
+                </div>
                 <div
                   className="overflow-hidden rounded-2xl"
                   style={{
@@ -130,9 +134,12 @@ function Ipos() {
             )}
 
             <div>
-              <h2 className="mb-3 font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--bunq-faint)]">
-                Curated · big rumored / pre-filed names
-              </h2>
+              <div className="mb-3 flex flex-wrap items-center gap-2">
+                <h2 className="font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--bunq-faint)]">
+                  Curated · big rumored / pre-filed names
+                </h2>
+                <DataProvenance kind="ipo_calendar" />
+              </div>
               <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
                 {data.ipos.map((ipo) => (
                   <IpoCard key={ipo.slug} ipo={ipo} />

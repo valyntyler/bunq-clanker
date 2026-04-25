@@ -54,6 +54,7 @@ export interface ConsumerPanelForecast {
   chart_url?: string | null;
   merchant_aliases?: string[];
   disclaimer?: string;
+  source?: "live" | "simulated";
 }
 
 export interface BunqSpendingOverlay {
@@ -92,6 +93,22 @@ export interface UserSource {
   trust_level: "high" | "medium" | "low";
 }
 
+export interface IndexProxy {
+  ticker: string;
+  name: string;
+  expense_ratio_bps?: number | null;
+}
+
+export interface IndexMembership {
+  key: string;
+  name: string;
+  region: string;
+  blurb: string;
+  proxies: IndexProxy[];
+  rationale: string;
+  member_count_demo: number;
+}
+
 export interface Report {
   ticker: string;
   company_name: string;
@@ -114,6 +131,7 @@ export interface Report {
   conflicts: string[];
   data_gaps: string[];
   citations: { id: string; title: string; url?: string | null }[];
+  index_options: IndexMembership[];
   disclaimer: string;
 }
 
@@ -128,6 +146,8 @@ export interface NearbyTicker {
 
 export interface InvestReceipt {
   bunq_payment_id: string | null;
+  bunq_pot_id: number | null;
+  bunq_pot_name: string | null;
   alpaca_order_id: string | null;
   ticker: string;
   amount_eur: number;
@@ -135,6 +155,71 @@ export interface InvestReceipt {
   shares: number;
   timestamp: string;
   verdict_snapshot: Record<string, unknown>;
+}
+
+export interface BunqProfile {
+  id: number;
+  display_name: string;
+  public_nick_name: string | null;
+  country: string | null;
+  language: string | null;
+  avatar_url: string | null;
+}
+
+export interface BunqAccount {
+  id: number;
+  description: string;
+  currency: string;
+  balance: number;
+  status: string;
+  iban: string | null;
+  is_main: boolean;
+  is_default_pot: boolean;
+  is_ticker_pot: boolean;
+  ticker: string | null;
+}
+
+export interface BunqAccountsList {
+  accounts: BunqAccount[];
+  summary: {
+    count: number;
+    total_eur: number;
+    ticker_pots: BunqAccount[];
+  };
+}
+
+export interface BunqPayment {
+  id: number;
+  account_id: number;
+  amount: number;
+  currency: string;
+  description: string;
+  type: string | null;
+  sub_type: string | null;
+  counterparty: string;
+  created: string | null;
+  updated: string | null;
+}
+
+export async function meBunqProfile(): Promise<BunqProfile> {
+  return j<BunqProfile>(await authFetch(`${BACKEND_URL}/me/bunq/profile`));
+}
+
+export async function meBunqAccounts(): Promise<BunqAccountsList> {
+  return j<BunqAccountsList>(
+    await authFetch(`${BACKEND_URL}/me/bunq/accounts`)
+  );
+}
+
+export async function meBunqActivity(opts?: {
+  accountId?: number;
+  count?: number;
+}): Promise<{ payments: BunqPayment[] }> {
+  const qs = new URLSearchParams();
+  if (opts?.accountId !== undefined) qs.set("account_id", String(opts.accountId));
+  if (opts?.count !== undefined) qs.set("count", String(opts.count));
+  const tail = qs.toString() ? `?${qs}` : "";
+  return j(await authFetch(`${BACKEND_URL}/me/bunq/activity${tail}`));
 }
 
 async function j<T>(r: Response): Promise<T> {
@@ -357,6 +442,8 @@ export interface InvestmentRow {
   amount_usd: number;
   fx_rate: number;
   bunq_payment_id: string | null;
+  bunq_pot_id: number | null;
+  bunq_pot_name: string | null;
   alpaca_order_id: string | null;
   alpaca_symbol: string;
   shares_estimated: number;
@@ -487,7 +574,13 @@ export interface PanelMonth {
 
 export async function panelData(
   ticker: string
-): Promise<{ ticker: string; panel_size_n: number; series: PanelMonth[] }> {
+): Promise<{
+  ticker: string;
+  panel_size_n: number;
+  source?: "live" | "simulated";
+  matched_count?: number;
+  series: PanelMonth[];
+}> {
   return j(
     await authFetch(`${BACKEND_URL}/panel-data/${encodeURIComponent(ticker)}`)
   );
@@ -507,17 +600,32 @@ export interface TrendingTicker {
   currency: string | null;
 }
 
+export type ChartPeriod =
+  | "1d"
+  | "5d"
+  | "1mo"
+  | "3mo"
+  | "6mo"
+  | "1y"
+  | "2y"
+  | "5y"
+  | "10y"
+  | "max";
+
 export async function getTrending(opts?: {
   hours?: number;
   limit?: number;
+  sparkPeriod?: ChartPeriod;
 }): Promise<{
   as_of: string;
   window_hours: number;
+  spark_period?: ChartPeriod;
   trending: TrendingTicker[];
 }> {
   const qs = new URLSearchParams();
   if (opts?.hours !== undefined) qs.set("hours", String(opts.hours));
   if (opts?.limit !== undefined) qs.set("limit", String(opts.limit));
+  if (opts?.sparkPeriod) qs.set("spark_period", opts.sparkPeriod);
   const url = `${BACKEND_URL}/trending${qs.toString() ? `?${qs}` : ""}`;
   return j(await authFetch(url));
 }
@@ -575,6 +683,254 @@ export async function getIpo(
 ): Promise<{ brief: IpoBrief; thesis: IpoThesis }> {
   return j(
     await authFetch(`${BACKEND_URL}/ipos/${encodeURIComponent(slug)}`)
+  );
+}
+
+// ---- receipt scan + bill-split ----------------------------------------
+
+export interface ReceiptItem {
+  name: string;
+  qty: number;
+  unit_price: number;
+  total_price: number;
+  category: string;
+  brand: string;
+  company: string;
+  ticker: string;
+  exchange: string;
+  is_listed: boolean;
+}
+
+export interface ReceiptByTicker {
+  ticker: string;
+  company: string;
+  spend: number;
+  items: number;
+}
+
+export interface ReceiptResult {
+  scanned_at: string;
+  image_bytes?: number;
+  merchant: string;
+  merchant_ticker: string;
+  merchant_company: string;
+  date: string;
+  currency: string;
+  country: string;
+  items: ReceiptItem[];
+  subtotal: number;
+  tax: number;
+  total: number;
+  confidence: number;
+  notes: string;
+  by_ticker: ReceiptByTicker[];
+  listed_total: number;
+  is_recent: boolean;
+}
+
+export async function scanReceipt(file: File | Blob): Promise<ReceiptResult> {
+  const fd = new FormData();
+  if (file instanceof File) fd.set("file", file);
+  else fd.set("file", file, "receipt.jpg");
+  return j<ReceiptResult>(
+    await authFetch(`${BACKEND_URL}/receipts/scan`, {
+      method: "POST",
+      body: fd,
+    })
+  );
+}
+
+export interface SplitParticipant {
+  name: string;
+  email: string;
+  amount_eur: number;
+}
+
+export interface SplitResult {
+  merchant: string;
+  currency: string;
+  sent_at: string;
+  results: {
+    name: string;
+    email: string;
+    amount_eur: number;
+    request_id: string | null;
+    error: string | null;
+  }[];
+}
+
+export async function sendSplitRequests(args: {
+  merchant: string;
+  currency: string;
+  participants: SplitParticipant[];
+}): Promise<SplitResult> {
+  return j<SplitResult>(
+    await authFetch(`${BACKEND_URL}/receipts/split/request`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(args),
+    })
+  );
+}
+
+// ---- pulse-check: public-sentiment scrape + Claude analysis ----------
+
+export type SentimentStance = "bullish" | "bearish" | "neutral";
+
+export interface SentimentPost {
+  source: "reddit" | "stocktwits" | "hackernews" | "news";
+  subforum: string;
+  title: string;
+  body: string;
+  url: string;
+  author: string;
+  posted_at: string;
+  score: number;
+  stance?: SentimentStance | null;
+  why?: string | null;
+}
+
+export interface SentimentTheme {
+  label: string;
+  stance: SentimentStance;
+  support_count: number;
+  summary: string;
+}
+
+export interface SentimentResult {
+  summary: string;
+  aggregate_score: number;
+  bullish_pct: number;
+  bearish_pct: number;
+  neutral_pct: number;
+  themes: SentimentTheme[];
+  market_impact: {
+    direction: SentimentStance;
+    magnitude: number;
+    horizon: "near-term" | "medium-term" | "long-term";
+    reasoning: string;
+  };
+  caveats: string[];
+  posts: SentimentPost[];
+  post_count: number;
+  by_source: Record<string, number>;
+}
+
+export type SentimentStepStatus = "running" | "done" | "error";
+
+export interface SentimentStepEvent {
+  step: "reddit" | "stocktwits" | "hackernews" | "news" | "analyze";
+  status: SentimentStepStatus;
+  detail?: Record<string, unknown>;
+}
+
+export async function streamSentiment(args: {
+  ticker: string;
+  companyName?: string;
+  onStep: (ev: SentimentStepEvent) => void;
+  signal?: AbortSignal;
+}): Promise<SentimentResult> {
+  const r = await authFetch(
+    `${BACKEND_URL}/sentiment/${encodeURIComponent(args.ticker)}/stream`,
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ company_name: args.companyName }),
+      signal: args.signal,
+    }
+  );
+  if (!r.ok || !r.body) {
+    throw new Error(`sentiment stream failed: ${r.status} ${r.statusText}`);
+  }
+  const reader = r.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let result: SentimentResult | null = null;
+  let error: string | null = null;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    let idx;
+    while ((idx = buffer.indexOf("\n\n")) >= 0) {
+      const chunk = buffer.slice(0, idx);
+      buffer = buffer.slice(idx + 2);
+      for (const line of chunk.split("\n")) {
+        if (!line.startsWith("data: ")) continue;
+        const payload = line.slice(6).trim();
+        if (!payload) continue;
+        try {
+          const ev = JSON.parse(payload);
+          if (ev.step) args.onStep(ev as SentimentStepEvent);
+          else if (ev.result) result = ev.result as SentimentResult;
+          else if (ev.error) error = ev.error;
+        } catch {
+          // ignore parse errors
+        }
+      }
+    }
+  }
+  if (error) throw new Error(error);
+  if (!result) throw new Error("sentiment stream completed without a result");
+  return result;
+}
+
+// ---- camera scan: image → product → company → ticker -----------------
+
+export interface WalletSignal {
+  matched: boolean;
+  total_spent_eur: number;
+  visit_count: number;
+  last_visit: string | null;
+  days_since_last: number | null;
+  trend: "accelerating" | "flat" | "declining";
+  monthly_counts: number[];
+  relationship: "loyal" | "regular" | "occasional" | "none";
+  relationship_label: string;
+  merchant_aliases: string[];
+  source: string;
+  live_total_eur: number;
+  live_count: number;
+  fixture_total_eur: number;
+  fixture_count: number;
+  top_city: string | null;
+}
+
+export interface ScanDetection {
+  object: string;
+  brand: string;
+  company: string;
+  ticker: string;
+  exchange: string;
+  parent_relationship: string;
+  is_subbrand: boolean;
+  confidence: number;
+  rationale: string;
+  investment_take: string;
+  is_listed: boolean;
+  wallet: WalletSignal | null;
+}
+
+export interface ScanResult {
+  scanned_at: string;
+  image_bytes?: number;
+  scene_summary: string;
+  detections: ScanDetection[];
+}
+
+export async function scanImage(file: File | Blob): Promise<ScanResult> {
+  const fd = new FormData();
+  // FormData wants a filename for File; coerce Blob to a stable name.
+  if (file instanceof File) {
+    fd.set("file", file);
+  } else {
+    fd.set("file", file, "scan.jpg");
+  }
+  return j<ScanResult>(
+    await authFetch(`${BACKEND_URL}/scan`, {
+      method: "POST",
+      body: fd,
+    })
   );
 }
 

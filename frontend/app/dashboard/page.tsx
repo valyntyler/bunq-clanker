@@ -6,6 +6,7 @@ import { AuthGuard } from "@/components/AuthGuard";
 import { Markdown } from "@/components/Markdown";
 import { SourceMedia, UserSourcePreview } from "@/components/SourcePreview";
 import { SpendingSection } from "@/components/SpendingSection";
+import { BunqAccountsSection } from "@/components/BunqAccountsSection";
 import {
   meAnalyses,
   meEvidence,
@@ -126,6 +127,9 @@ function Dashboard() {
           sub="sources · runs"
         />
       </div>
+
+      {/* ── live Bunq accounts + activity (sandbox) ──────── */}
+      <BunqAccountsSection />
 
       {/* ── spending patterns + discovery ─────────────────── */}
       {spend && <SpendingSection data={spend} />}
@@ -358,6 +362,15 @@ function InvestmentRowView({ r }: { r: InvestmentRow }) {
         <div className="font-mono text-[10px] text-[var(--bunq-faint)]">
           ${r.amount_usd.toFixed(2)} @ {r.fx_rate.toFixed(2)}
         </div>
+        {r.bunq_pot_name && (
+          <div
+            className="mt-0.5 font-mono text-[10px]"
+            style={{ color: "var(--bunq-green)" }}
+            title={r.bunq_pot_id ? `Bunq pot #${r.bunq_pot_id}` : ""}
+          >
+            ↳ {r.bunq_pot_name}
+          </div>
+        )}
       </Td>
       <Td>
         <div className="font-mono text-[11px] text-[var(--bunq-muted)]">

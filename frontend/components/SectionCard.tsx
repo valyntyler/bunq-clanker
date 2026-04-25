@@ -1,6 +1,16 @@
+import { DataProvenance, type ProvenanceKind } from "@/components/DataProvenance";
 import { Markdown } from "@/components/Markdown";
 import { PriceChart } from "@/components/PriceChart";
 import type { Section } from "@/lib/api";
+
+const PROV_FOR: Record<string, ProvenanceKind> = {
+  fundamentals: "fundamentals",
+  news: "news",
+  chart: "chart",
+  website: "website",
+  earnings_call: "earnings_call",
+  leadership: "leadership",
+};
 
 function scoreColor(score: number) {
   if (score >= 0.3) return "text-[var(--bunq-green)]";
@@ -60,7 +70,7 @@ export function SectionCard({
         </div>
       )}
       <div className="p-5">
-        <div className="flex items-baseline justify-between">
+        <div className="flex items-baseline justify-between gap-2">
           <h3 className="font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--bunq-muted)]">
             {name.replace(/_/g, " ")}
           </h3>
@@ -69,6 +79,11 @@ export function SectionCard({
             {section.score.toFixed(2)}
           </span>
         </div>
+        {PROV_FOR[name] && (
+          <div className="mt-1.5">
+            <DataProvenance kind={PROV_FOR[name]} />
+          </div>
+        )}
         <Markdown
           text={section.summary}
           className="mt-2 text-sm leading-relaxed text-[var(--bunq-text)]/90"

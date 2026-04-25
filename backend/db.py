@@ -44,6 +44,8 @@ class Investment(SQLModel, table=True):
     amount_usd: float
     fx_rate: float
     bunq_payment_id: str | None = None
+    bunq_pot_id: int | None = None
+    bunq_pot_name: str | None = None
     alpaca_order_id: str | None = None
     alpaca_symbol: str = ""
     shares_estimated: float = 0.0

@@ -9,6 +9,7 @@ export function TopBar() {
   const router = useRouter();
   const pathname = usePathname();
   if (!user) return null;
+  const initial = user.email.slice(0, 1).toUpperCase();
   return (
     <div
       className="sticky top-0 z-40 flex items-center justify-between border-b px-5 py-2.5"
@@ -32,6 +33,16 @@ export function TopBar() {
       <div className="flex items-center gap-2">
         <NavLink href="/" label="Analyze" active={pathname === "/"} />
         <NavLink
+          href="/scan"
+          label="Scan"
+          active={pathname?.startsWith("/scan") ?? false}
+        />
+        <NavLink
+          href="/receipts"
+          label="Receipts"
+          active={pathname?.startsWith("/receipts") ?? false}
+        />
+        <NavLink
           href="/ipos"
           label="IPOs"
           active={pathname?.startsWith("/ipos") ?? false}
@@ -41,8 +52,21 @@ export function TopBar() {
           label="Dashboard"
           active={pathname?.startsWith("/dashboard") ?? false}
         />
-        <span className="ml-3 hidden font-mono text-[11px] text-[var(--bunq-muted)] sm:inline">
-          {user.email}
+        <span
+          className="ml-3 hidden items-center gap-2 font-mono text-[11px] text-[var(--bunq-muted)] sm:inline-flex"
+          title={user.email}
+        >
+          <span
+            className="inline-flex h-5 w-5 items-center justify-center rounded-full text-[9px] font-bold"
+            style={{
+              background: "var(--bunq-surface-2)",
+              color: "var(--bunq-faint)",
+              border: "1px solid var(--bunq-border)",
+            }}
+          >
+            {initial}
+          </span>
+          <span className="text-[var(--bunq-text)]">{user.email}</span>
         </span>
         <button
           onClick={() => {

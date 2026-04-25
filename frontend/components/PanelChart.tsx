@@ -11,16 +11,24 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { DataProvenance } from "@/components/DataProvenance";
 import { panelData, type PanelMonth } from "@/lib/api";
 
 export function PanelChart({ ticker }: { ticker: string }) {
   const [series, setSeries] = useState<PanelMonth[] | null>(null);
+  const [source, setSource] = useState<"live" | "simulated" | null>(null);
+  const [matched, setMatched] = useState<number>(0);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     panelData(ticker)
-      .then((d) => !cancelled && setSeries(d.series))
+      .then((d) => {
+        if (cancelled) return;
+        setSeries(d.series);
+        setSource(d.source ?? "simulated");
+        setMatched(d.matched_count ?? 0);
+      })
       .catch((e) => !cancelled && setError((e as Error).message));
     return () => {
       cancelled = true;
@@ -39,7 +47,28 @@ export function PanelChart({ ticker }: { ticker: string }) {
   const recent = series.slice(-12);
 
   return (
-    <div className="h-44 w-full">
+    <div className="w-full">
+      <div className="mb-1 flex justify-end">
+        {source === "live" ? (
+          <DataProvenance
+            kind="panel_chart"
+            detail={`live · ${matched} matched`}
+            override={{
+              label: "Bunq panel · live",
+              what: "12-month bars of Bunq sandbox spend matching the ticker's merchant aliases, vs same-month prior year.",
+              source:
+                "Bunq sandbox /v1/user/{id}/monetary-account/{aid}/payment.",
+              method:
+                "Outflows aggregated by month, alias-matched on counterparty + description. Prior-year baseline still pulled from the simulated fixture so YoY makes sense in a thin sandbox.",
+              freshness: "Pulled live; trailing 24 months window.",
+              caveat: undefined,
+            }}
+          />
+        ) : (
+          <DataProvenance kind="panel_chart" />
+        )}
+      </div>
+      <div className="h-44 w-full">
       <ResponsiveContainer>
         <BarChart
           data={recent}
@@ -97,6 +126,7 @@ export function PanelChart({ ticker }: { ticker: string }) {
           />
         </BarChart>
       </ResponsiveContainer>
+      </div>
     </div>
   );
 }

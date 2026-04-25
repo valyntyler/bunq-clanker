@@ -3,18 +3,62 @@
 /**
  * Tiny inline-markdown renderer for Claude output. Handles only the patterns
  * Claude actually emits in this app:
- *   **bold**         → <strong>
- *   *italic*  / _x_  → <em>
- *   `code`           → <code>
- *   [text](url)      → <a> (new tab)
- *   single \n        → <br/>
- *   blank line       → new <p>
+ *   **bold**             → <strong>
+ *   *italic*  / _x_      → <em>
+ *   `code`               → <code>
+ *   [text](url)          → <a> (new tab)
+ *   [module]             → small inline citation chip (module name visible)
+ *   [module:event-id]    → small inline citation chip (full id in tooltip)
+ *   single \n            → <br/>
+ *   blank line           → new <p>
  *
- * Bracketed citations like [fundamentals], [news], [user:abc] pass through
- * as plain text — they're not links.
+ * The citation chips are how the synthesizer cites which module supported
+ * each claim — without rendering them as chips they show up as ugly inline
+ * text that breaks the typography.
  */
 
 import React from "react";
+
+const CITATION_MODULES = new Set([
+  "fundamentals",
+  "news",
+  "chart",
+  "website",
+  "earnings_call",
+  "leadership",
+  "panel",
+  "consumer_panel",
+  "bunq_spending",
+  "geopolitical",
+  "user",
+]);
+
+function CitationChip({
+  module,
+  eventId,
+}: {
+  module: string;
+  eventId?: string;
+}) {
+  return (
+    <span
+      title={eventId ? `${module} · ${eventId}` : module}
+      className="mx-0.5 inline-flex items-baseline rounded-full px-1.5 py-0 align-baseline font-mono text-[9px] uppercase tracking-[0.14em]"
+      style={{
+        background: "var(--bunq-surface-2)",
+        color: "var(--bunq-faint)",
+        border: "1px solid var(--bunq-border)",
+      }}
+    >
+      {module.replace(/_/g, " ")}
+      {eventId && (
+        <span className="ml-1 max-w-[80px] truncate opacity-70">
+          {eventId.split("-").slice(0, 2).join("-")}
+        </span>
+      )}
+    </span>
+  );
+}
 
 export function Markdown({
   text,
@@ -123,9 +167,11 @@ function renderInline(text: string): React.ReactNode[] {
         continue;
       }
     }
-    // [text](url) — exclude bracketed citations like [fundamentals]
+    // [text](url) — markdown link.
+    // [module] / [module:event-id] — synthesizer citation chip.
     if (text[i] === "[") {
       const closeBracket = text.indexOf("]", i + 1);
+      // Markdown link first (text followed by parenthesised URL)
       if (closeBracket > i && text[closeBracket + 1] === "(") {
         const closeParen = text.indexOf(")", closeBracket + 2);
         if (closeParen > closeBracket + 1) {
@@ -147,6 +193,18 @@ function renderInline(text: string): React.ReactNode[] {
             i = closeParen + 1;
             continue;
           }
+        }
+      }
+      // Citation chip: [module] or [module:event-id]
+      if (closeBracket > i + 1) {
+        const inner = text.slice(i + 1, closeBracket);
+        const m = inner.match(/^([a-z_]+)(?::([^\]]+))?$/);
+        if (m && CITATION_MODULES.has(m[1])) {
+          out.push(
+            <CitationChip key={k++} module={m[1]} eventId={m[2]} />
+          );
+          i = closeBracket + 1;
+          continue;
         }
       }
     }

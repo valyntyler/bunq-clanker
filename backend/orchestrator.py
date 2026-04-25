@@ -18,6 +18,7 @@ from backend.analyzers.consumer_panel import analyze_consumer_panel
 from backend.analyzers.fundamentals import analyze_fundamentals
 from backend.analyzers.geopolitical import analyze_geopolitical
 from backend.analyzers.geopolitical_video import analyze_geopolitical_video
+from backend.analyzers.index_membership import memberships_for
 from backend.analyzers.news_sentiment import analyze_news
 from backend.analyzers.synthesizer import synthesize
 from backend.models import (
@@ -205,6 +206,7 @@ async def analyze_async(
         risks=synth.get("risks", []),
         conflicts=synth.get("conflicts", []),
         data_gaps=synth.get("data_gaps", []),
+        index_options=memberships_for(ticker),
     )
 
 
@@ -358,5 +360,6 @@ async def analyze_stream(
         risks=synth.get("risks", []),
         conflicts=synth.get("conflicts", []),
         data_gaps=synth.get("data_gaps", []),
+        index_options=memberships_for(ticker),
     )
     yield {"event": "report", "report": report.model_dump()}

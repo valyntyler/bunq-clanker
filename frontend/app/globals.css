@@ -57,3 +57,23 @@ html, body {
     0 0 0 1px rgba(181, 255, 0, 0.18),
     0 14px 30px -8px rgba(181, 255, 0, 0.20);
 }
+
+/* Shimmer for loading skeletons — sweeps a soft highlight across the
+ * surface so it's obvious the panel is still rendering vs. permanently
+ * empty. Applied to .bunq-skeleton elements. */
+@keyframes bunq-shimmer {
+  0% { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
+}
+.bunq-skeleton {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(
+    90deg,
+    var(--bunq-surface) 0%,
+    var(--bunq-surface-2) 40%,
+    var(--bunq-surface) 80%
+  );
+  background-size: 800px 100%;
+  animation: bunq-shimmer 1.4s linear infinite;
+}

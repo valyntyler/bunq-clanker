@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { DataProvenance } from "@/components/DataProvenance";
 import { nearbyTickers, type NearbyTicker } from "@/lib/api";
 
 export function NearbyTickersPicker({
@@ -94,8 +95,11 @@ export function NearbyTickersPicker({
             border: "1px solid var(--bunq-border)",
           }}
         >
-          <div className="px-4 py-2 font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--bunq-faint)]">
-            within 5km · {coords.lat.toFixed(4)}, {coords.lng.toFixed(4)}
+          <div className="flex flex-wrap items-center gap-2 px-4 py-2 font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--bunq-faint)]">
+            <span>
+              within 5km · {coords.lat.toFixed(4)}, {coords.lng.toFixed(4)}
+            </span>
+            <DataProvenance kind="nearby" />
           </div>
           {results.slice(0, 8).map((r, i) => (
             <button

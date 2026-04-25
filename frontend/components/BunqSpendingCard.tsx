@@ -1,3 +1,4 @@
+import { DataProvenance } from "@/components/DataProvenance";
 import { Term } from "@/components/Glossary";
 import type { BunqSpendingOverlay } from "@/lib/api";
 
@@ -31,11 +32,12 @@ export function BunqSpendingCard({
       {/* Bunq-style top stripe */}
       <div className="absolute inset-x-0 top-0 h-[3px] bg-[var(--bunq-green)]" />
 
-      <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--bunq-green)]">
+      <div className="flex flex-wrap items-center gap-2 font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--bunq-green)]">
         <BunqMark />
         <span className="text-[var(--bunq-muted)]">
           your wallet · personal conviction · {ticker}
         </span>
+        <DataProvenance kind="bunq_personal" />
       </div>
 
       <div className="mt-4 flex items-end justify-between gap-4">

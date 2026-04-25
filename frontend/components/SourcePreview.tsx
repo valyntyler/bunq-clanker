@@ -157,15 +157,7 @@ export function GeopoliticalPreview({
           className="mt-4 aspect-video w-full rounded-xl bg-black"
         />
       ) : (
-        <div
-          className="mt-4 flex aspect-video w-full items-center justify-center rounded-xl border border-dashed font-mono text-[10px] uppercase tracking-[0.18em]"
-          style={{
-            borderColor: "var(--bunq-border-strong)",
-            color: "var(--bunq-faint)",
-          }}
-        >
-          live RSS · text-only
-        </div>
+        <TextOnlyEventStrip overlay={overlay} />
       )}
 
       <div className="mt-4">
@@ -329,6 +321,137 @@ export function SourceMedia({
     );
   }
   return null;
+}
+
+function TextOnlyEventStrip({ overlay }: { overlay: GeopoliticalOverlay }) {
+  const host = overlay.source_url ? safeHost(overlay.source_url) : null;
+  const dirGlyph =
+    overlay.impact_direction > 0
+      ? "+"
+      : overlay.impact_direction < 0
+        ? "−"
+        : "·";
+  const dirColor =
+    overlay.impact_direction > 0
+      ? "var(--bunq-green)"
+      : overlay.impact_direction < 0
+        ? "var(--bunq-bad)"
+        : "var(--bunq-muted)";
+  const relPct = Math.round(Math.max(0, Math.min(1, overlay.relevance)) * 100);
+  const impPct = Math.round(
+    Math.max(0, Math.min(1, Math.abs(overlay.impact_magnitude))) * 100
+  );
+  return (
+    <div
+      className="mt-4 grid gap-3 rounded-xl p-4 sm:grid-cols-[1fr_auto]"
+      style={{
+        background:
+          "linear-gradient(160deg, rgba(181,255,0,0.04), var(--bunq-surface-2))",
+        border: "1px solid var(--bunq-border)",
+      }}
+    >
+      <div className="min-w-0">
+        <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--bunq-faint)]">
+          live · text-only event
+        </div>
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          {host && (
+            <a
+              href={overlay.source_url ?? "#"}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="rounded-full px-2 py-0.5 font-mono text-[10px]"
+              style={{
+                background: "var(--bunq-surface)",
+                color: "var(--bunq-green)",
+                border: "1px solid var(--bunq-border-strong)",
+              }}
+            >
+              {host} ↗
+            </a>
+          )}
+          <span
+            className="rounded-full px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.16em]"
+            style={{
+              background: "var(--bunq-surface)",
+              color: "var(--bunq-muted)",
+              border: "1px solid var(--bunq-border)",
+            }}
+          >
+            no clip · scored from headline + snippet
+          </span>
+        </div>
+        {overlay.transcript_excerpt && (
+          <p
+            className="mt-3 line-clamp-3 text-sm leading-snug text-[var(--bunq-text)]/90"
+            title={overlay.transcript_excerpt}
+          >
+            {overlay.transcript_excerpt}
+          </p>
+        )}
+      </div>
+      <div className="flex flex-col gap-2 text-right">
+        <Bar label="rel" value={relPct} color="var(--bunq-green)" />
+        <Bar
+          label="impact"
+          value={impPct}
+          color={dirColor}
+          prefix={dirGlyph}
+          rawValue={overlay.impact_magnitude}
+        />
+      </div>
+    </div>
+  );
+}
+
+function Bar({
+  label,
+  value,
+  color,
+  prefix,
+  rawValue,
+}: {
+  label: string;
+  value: number;
+  color: string;
+  prefix?: string;
+  rawValue?: number;
+}) {
+  return (
+    <div className="w-32">
+      <div className="flex items-baseline justify-between">
+        <span className="font-mono text-[9px] uppercase tracking-[0.18em] text-[var(--bunq-faint)]">
+          {label}
+        </span>
+        <span
+          className="bunq-numeral font-mono text-[11px]"
+          style={{ color }}
+        >
+          {prefix ?? ""}
+          {rawValue !== undefined
+            ? rawValue.toFixed(2)
+            : (value / 100).toFixed(2)}
+        </span>
+      </div>
+      <div
+        className="mt-1 h-1 w-full rounded-full"
+        style={{ background: "var(--bunq-surface)" }}
+      >
+        <div
+          className="h-1 rounded-full"
+          style={{ width: `${value}%`, background: color }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function safeHost(url: string): string | null {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return null;
+  }
 }
 
 function SubLayer({ label, body }: { label: string; body: string }) {

@@ -74,6 +74,7 @@ class ConsumerPanelForecast(BaseModel):
     disclaimer: str = (
         "Aggregated, anonymized. Panel is NL-skewed. Simulated for hackathon prototype."
     )
+    source: Literal["live", "simulated"] = "simulated"
 
 
 class LocationContext(BaseModel):
@@ -86,6 +87,22 @@ class Citation(BaseModel):
     id: str
     title: str
     url: str | None = None
+
+
+class IndexProxy(BaseModel):
+    ticker: str
+    name: str
+    expense_ratio_bps: int | None = None
+
+
+class IndexMembership(BaseModel):
+    key: str
+    name: str
+    region: str
+    blurb: str = ""
+    proxies: list[IndexProxy] = []
+    rationale: str = ""
+    member_count_demo: int = 0
 
 
 class Report(BaseModel):
@@ -106,6 +123,7 @@ class Report(BaseModel):
     conflicts: list[str] = []
     data_gaps: list[str] = []
     citations: list[Citation] = []
+    index_options: list[IndexMembership] = []
     disclaimer: str = (
         "This is a hackathon prototype. Nothing here is financial advice. "
         "All money movement is in sandbox/paper environments."
@@ -199,6 +217,8 @@ class InvestRequest(BaseModel):
 
 class InvestReceipt(BaseModel):
     bunq_payment_id: str | None
+    bunq_pot_id: int | None = None
+    bunq_pot_name: str | None = None
     alpaca_order_id: str | None
     ticker: str
     amount_eur: float

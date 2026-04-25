@@ -112,15 +112,20 @@ def render_candlestick_png(
     hist = _ticker(symbol).history(period=period)
     if hist.empty:
         raise RuntimeError(f"no price history for {symbol}")
+    # For multi-year periods (5y / 10y / max) candles become a smudge —
+    # auto-switch to a clean line chart so the long-arc trend reads cleanly.
+    bars = len(hist)
+    plot_type = "line" if bars > 400 else "candle"
     buf = io.BytesIO()
     mpf.plot(
         hist,
-        type="candle",
+        type=plot_type,
         volume=True,
         style="charles",
         title=f"{symbol} · {period}",
         figratio=(16, 10),
         figscale=1.2,
+        warn_too_much_data=10_000,
         savefig=dict(fname=buf, format="png", dpi=100, bbox_inches="tight"),
     )
     buf.seek(0)

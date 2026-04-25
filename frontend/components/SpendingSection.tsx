@@ -14,6 +14,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { DataProvenance } from "@/components/DataProvenance";
 import type { SpendingInsights } from "@/lib/api";
 
 const CATEGORY_COLORS = [
@@ -33,9 +34,15 @@ export function SpendingSection({ data }: { data: SpendingInsights }) {
   if (data.visit_count === 0) return null;
   return (
     <section>
-      <h2 className="mb-3 font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--bunq-faint)]">
-        Spending patterns
-      </h2>
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <h2 className="font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--bunq-faint)]">
+          Spending patterns
+        </h2>
+        <DataProvenance
+          kind="spending_insights"
+          detail={`${data.visit_count} payments · €${Math.round(data.total_eur).toLocaleString()}`}
+        />
+      </div>
 
       <div className="grid gap-3 md:grid-cols-3">
         <SummaryTile
@@ -232,13 +239,19 @@ export function SpendingSection({ data }: { data: SpendingInsights }) {
 
       {data.discovery.length > 0 && (
         <div className="mt-4">
-          <h3 className="mb-2 flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--bunq-green)]">
-            <span
-              className="inline-flex h-1.5 w-1.5 rounded-full"
-              style={{ background: "var(--bunq-green)" }}
-            />
-            Categories you could move into
-          </h3>
+          <div className="mb-2 flex flex-wrap items-center gap-2">
+            <h3 className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--bunq-green)]">
+              <span
+                className="inline-flex h-1.5 w-1.5 rounded-full"
+                style={{ background: "var(--bunq-green)" }}
+              />
+              Categories you could move into
+            </h3>
+            <span className="text-[10px] text-[var(--bunq-muted)]">
+              peers in categories you spend in but don't yet hold
+            </span>
+            <DataProvenance kind="spending_insights" detail="discovery" />
+          </div>
           <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-3">
             {data.discovery.map((d) => (
               <Link

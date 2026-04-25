@@ -3,7 +3,23 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Area, AreaChart, ResponsiveContainer, Tooltip } from "recharts";
-import { getTrending, type TrendingTicker } from "@/lib/api";
+import { DataProvenance } from "@/components/DataProvenance";
+import {
+  getTrending,
+  type ChartPeriod,
+  type TrendingTicker,
+} from "@/lib/api";
+
+// Period choices shown to the user. Backend understands all yfinance period
+// strings; we surface a subset that's useful at a glance.
+const PERIODS: { id: ChartPeriod; label: string }[] = [
+  { id: "1mo", label: "1M" },
+  { id: "3mo", label: "3M" },
+  { id: "6mo", label: "6M" },
+  { id: "1y", label: "1Y" },
+  { id: "5y", label: "5Y" },
+  { id: "max", label: "MAX" },
+];
 
 const VERDICT_PALETTE: Record<
   NonNullable<TrendingTicker["latest_verdict"]>,
@@ -52,17 +68,21 @@ export function TrendingTickers() {
     as_of: string;
     trending: TrendingTicker[];
   } | null>(null);
+  const [period, setPeriod] = useState<ChartPeriod>("1mo");
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    getTrending({ hours: 168, limit: 12 })
+    setRefreshing(true);
+    getTrending({ hours: 168, limit: 12, sparkPeriod: period })
       .then((d) => !cancelled && setData(d))
-      .catch((e) => !cancelled && setError((e as Error).message));
+      .catch((e) => !cancelled && setError((e as Error).message))
+      .finally(() => !cancelled && setRefreshing(false));
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [period]);
 
   if (error)
     return (
@@ -86,13 +106,19 @@ export function TrendingTickers() {
 
   return (
     <section>
-      <div className="mb-3 flex items-baseline justify-between">
-        <h2 className="font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--bunq-faint)]">
-          What others are watching
-        </h2>
-        <span className="font-mono text-[10px] text-[var(--bunq-faint)]">
-          last 7 days
-        </span>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <h2 className="font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--bunq-faint)]">
+            What others are watching
+          </h2>
+          <DataProvenance kind="trending" />
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="font-mono text-[10px] text-[var(--bunq-faint)]">
+            sparkline · {refreshing ? "loading…" : period}
+          </span>
+          <PeriodSelector value={period} onChange={setPeriod} />
+        </div>
       </div>
       <div className="-mx-1 flex snap-x snap-mandatory gap-3 overflow-x-auto px-1 pb-2">
         {data.trending.map((t) => (
@@ -100,6 +126,41 @@ export function TrendingTickers() {
         ))}
       </div>
     </section>
+  );
+}
+
+function PeriodSelector({
+  value,
+  onChange,
+}: {
+  value: ChartPeriod;
+  onChange: (p: ChartPeriod) => void;
+}) {
+  return (
+    <div className="flex gap-1">
+      {PERIODS.map((p) => (
+        <button
+          key={p.id}
+          onClick={() => onChange(p.id)}
+          className="rounded-full px-2.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.16em] transition"
+          style={
+            value === p.id
+              ? {
+                  background: "var(--bunq-green-soft)",
+                  color: "var(--bunq-green)",
+                  border: "1px solid rgba(181,255,0,0.30)",
+                }
+              : {
+                  background: "var(--bunq-surface-2)",
+                  color: "var(--bunq-muted)",
+                  border: "1px solid var(--bunq-border)",
+                }
+          }
+        >
+          {p.label}
+        </button>
+      ))}
+    </div>
   );
 }
 
