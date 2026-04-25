@@ -647,3 +647,84 @@ def attach_existing_api_key(api_key: str) -> dict:
         "display_name": display_name,
         "country": country,
     }
+
+
+# Sandbox sugardaddy@bunq.com auto-accepts per-request, but rejects amounts
+# above ~€100 in a single call. Chunk anything larger.
+_SUGARDADDY_MAX_PER_REQUEST = 100.0
+
+
+def _request_one_topup(c: BunqClient, creds: _Creds, amount_eur: float) -> str:
+    resp = c.post(
+        f"user/{creds.user_id}/monetary-account/{creds.main_id}/request-inquiry",
+        body={
+            "amount_inquired": {
+                "value": f"{amount_eur:.2f}",
+                "currency": "EUR",
+            },
+            "counterparty_alias": {
+                "type": "EMAIL",
+                "value": "sugardaddy@bunq.com",
+                "name": "Sugar Daddy",
+            },
+            "description": "Sauron demo seed",
+            "allow_bunqme": False,
+        },
+    )
+    for item in resp:
+        if "Id" in item:
+            return str(item["Id"]["id"])
+    return "?"
+
+
+def topup_main_from_sugardaddy(
+    amount_eur: float, *, user: Any | None = None
+) -> list[str]:
+    """Top up the user's MAIN account from sugardaddy@bunq.com — the
+    sandbox-only counterparty that auto-accepts RequestInquiry up to a
+    per-request cap (~€100). Anything larger is split into chunks and
+    fired sequentially. Returns the list of RequestInquiry ids issued.
+
+    This is the only mechanism Bunq sandbox exposes for funding a
+    freshly-minted user beyond the small default seed.
+    """
+    creds = _resolve(user)
+    c = _client_for(creds.api_key)
+    remaining = max(0.0, float(amount_eur))
+    request_ids: list[str] = []
+    while remaining > 0.005:
+        chunk = min(_SUGARDADDY_MAX_PER_REQUEST, remaining)
+        request_ids.append(_request_one_topup(c, creds, chunk))
+        remaining -= chunk
+    return request_ids
+
+
+def get_main_balance_eur(*, user: Any | None = None) -> float:
+    """Read the current main-account balance in EUR. Used by the demo
+    seeder to decide whether a top-up is still needed."""
+    creds = _resolve(user)
+    c = _client_for(creds.api_key)
+    resp = c.get(f"user/{creds.user_id}/monetary-account/{creds.main_id}")
+    if not resp:
+        return 0.0
+    ma = resp[0].get("MonetaryAccountBank") or {}
+    val = (ma.get("balance") or {}).get("value")
+    try:
+        return float(val) if val is not None else 0.0
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def get_pot_balance_eur(*, user: Any | None = None) -> float:
+    """Read the current Investment Pot balance in EUR."""
+    creds = _resolve(user)
+    c = _client_for(creds.api_key)
+    resp = c.get(f"user/{creds.user_id}/monetary-account/{creds.pot_id}")
+    if not resp:
+        return 0.0
+    ma = resp[0].get("MonetaryAccountBank") or {}
+    val = (ma.get("balance") or {}).get("value")
+    try:
+        return float(val) if val is not None else 0.0
+    except (TypeError, ValueError):
+        return 0.0

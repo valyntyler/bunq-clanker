@@ -110,6 +110,15 @@ async def _startup() -> None:
     except Exception:  # noqa: BLE001
         log.exception("whisper: warmup failed (will lazy-load on first call)")
 
+    # Seed (or refresh-attach) the public demo account so judges can sign
+    # in with `demo@sauron.app` / `demo1234` immediately. Idempotent —
+    # the seeder is a no-op if the row already exists.
+    try:
+        from backend.seed import seed_demo_account
+        await asyncio.to_thread(seed_demo_account)
+    except Exception:  # noqa: BLE001
+        log.exception("seed: demo account seeding failed (non-fatal)")
+
 
 def _migrate_investment_columns() -> None:
     """SQLite ALTER TABLE shim — adds new columns that SQLModel.metadata.create_all
@@ -227,7 +236,9 @@ def auth_login(req: LoginRequest, session: Session = Depends(get_session)) -> Au
 
 @app.post("/auth/oauth", response_model=AuthResponse)
 def auth_oauth(payload: dict, session: Session = Depends(get_session)) -> AuthResponse:
-    """OAuth-style sign-in for Google / Apple-iCloud / generic providers.
+    """OAuth-style sign-in. The UI exposes Google only; the endpoint will
+    accept any provider tag for forward compatibility but we don't ship any
+    other branded tabs.
 
     Hackathon-grade: in production we'd verify a real OIDC id_token from the
     provider; here we accept the email + display_name + provider tag the
@@ -235,7 +246,7 @@ def auth_oauth(payload: dict, session: Session = Depends(get_session)) -> AuthRe
 
     Body:
         {
-          provider:   'google' | 'apple' | str,
+          provider:   'google' | str,
           email:      str,
           display_name?: str,
           mode:       'login' | 'register'      # required — controls whether
@@ -249,7 +260,7 @@ def auth_oauth(payload: dict, session: Session = Depends(get_session)) -> AuthRe
         mode=register + user missing  → 200 (creates user)
         mode=register + user exists   → 409 "account already exists"
     """
-    provider = (payload.get("provider") or "").strip().lower()[:32] or "oauth"
+    provider = (payload.get("provider") or "").strip().lower()[:32] or "google"
     email = (payload.get("email") or "").strip().lower()
     display_name = (payload.get("display_name") or "").strip()[:80]
     mode = (payload.get("mode") or "").strip().lower()
@@ -386,6 +397,16 @@ def me_bunq_connect(
 @app.get("/auth/me")
 def auth_me(user: User = Depends(require_user)) -> dict:
     return _user_dict(user)
+
+
+@app.get("/auth/demo-credentials")
+def auth_demo_credentials() -> dict:
+    """Public credentials for the seeded demo account. Surfaced on the
+    login page so judges can sign straight in. Sandbox-only; the password
+    is not a secret."""
+    from backend.seed import DEMO_EMAIL, DEMO_PASSWORD
+
+    return {"email": DEMO_EMAIL, "password": DEMO_PASSWORD}
 
 
 # ---- per-user dashboard --------------------------------------------------
