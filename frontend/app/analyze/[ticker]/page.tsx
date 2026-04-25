@@ -17,6 +17,12 @@ import { AddEvidenceModal } from "@/components/AddEvidenceModal";
 import { AuthGuard } from "@/components/AuthGuard";
 import { ChatPanel } from "@/components/ChatPanel";
 import { Markdown } from "@/components/Markdown";
+import {
+  emptyPipelineState,
+  PipelineStatus,
+  type PipelineState,
+} from "@/components/PipelineStatus";
+import { UserSourceClaims } from "@/components/UserSourceClaims";
 import { VerdictBanner } from "@/components/VerdictBanner";
 import { SectionCard } from "@/components/SectionCard";
 import { PanelForecastCard } from "@/components/PanelForecastCard";
@@ -77,6 +83,8 @@ function AnalyzePage() {
   const [panel, setPanel] = useState<ConsumerPanelForecast | null>(null);
   const [bunqSpending, setBunqSpending] = useState<BunqSpendingOverlay | null>(null);
   const [pending, setPending] = useState(true);
+  const [synthesizing, setSynthesizing] = useState(false);
+  const [pipeline, setPipeline] = useState<PipelineState>(emptyPipelineState());
   const [err, setErr] = useState<string | null>(null);
   const [investOpen, setInvestOpen] = useState(false);
   const [evidenceOpen, setEvidenceOpen] = useState(false);
@@ -97,6 +105,8 @@ function AnalyzePage() {
     setBunqSpending(null);
     setUserSources([]);
     setGeoOverlays([]);
+    setPipeline(emptyPipelineState());
+    setSynthesizing(false);
     setErr(null);
     setPending(true);
     startedAt.current = performance.now();
@@ -110,9 +120,73 @@ function AnalyzePage() {
           break;
         case "module_start":
           log(`▷ ${ev.label}`);
+          setPipeline((prev) => ({
+            ...prev,
+            [ev.name]: prev[ev.name]
+              ? {
+                  ...prev[ev.name],
+                  status: "running" as const,
+                  startedAt: performance.now(),
+                }
+              : prev[ev.name],
+          }));
           break;
         case "module_done": {
           const dt = ((performance.now() - startedAt.current) / 1000).toFixed(1);
+
+          // 1. Update PipelineStatus card state
+          setPipeline((prev) => {
+            const cur = prev[ev.name];
+            if (!cur) return prev;
+            const elapsedMs =
+              cur.status === "running" ? performance.now() - cur.startedAt : 0;
+            if (ev.error) {
+              return {
+                ...prev,
+                [ev.name]: {
+                  status: "error" as const,
+                  label: cur.label,
+                  desc: cur.desc,
+                  error: ev.error,
+                },
+              };
+            }
+            let score: number | undefined;
+            let summary: string | undefined;
+            if (ev.section) {
+              score = ev.section.score;
+              summary = ev.section.summary;
+            } else if (ev.data && !Array.isArray(ev.data)) {
+              const d = ev.data as ConsumerPanelForecast | BunqSpendingOverlay;
+              if ("yoy_change_pct" in d) {
+                score = d.yoy_change_pct / 30;
+              } else if ("personal_conviction_score" in d) {
+                score = d.personal_conviction_score;
+              }
+            } else if (Array.isArray(ev.data)) {
+              const overlays = ev.data as GeopoliticalOverlay[];
+              const avg = overlays.length
+                ? overlays.reduce(
+                    (s, o) => s + o.impact_direction * o.impact_magnitude,
+                    0
+                  ) / overlays.length
+                : 0;
+              score = avg;
+            }
+            return {
+              ...prev,
+              [ev.name]: {
+                status: "done" as const,
+                label: cur.label,
+                desc: cur.desc,
+                elapsedMs,
+                score,
+                summary,
+              },
+            };
+          });
+
+          // 2. Update terminal log + section/overlay state
           if (ev.error) {
             log(`✗ ${ev.name} (${dt}s) — ${ev.error}`);
           } else if (ev.section) {
@@ -146,6 +220,7 @@ function AnalyzePage() {
         }
         case "synthesizing":
           log("⟳ synthesizing verdict from all modules…");
+          setSynthesizing(true);
           break;
         case "report": {
           const dt = ((performance.now() - startedAt.current) / 1000).toFixed(1);
@@ -153,12 +228,14 @@ function AnalyzePage() {
             `★ verdict=${ev.report.verdict} conf=${ev.report.confidence.toFixed(2)} · total ${dt}s`
           );
           setReport(ev.report);
+          setSynthesizing(false);
           setPending(false);
           break;
         }
         case "error":
           log(`ERROR: ${ev.message}`);
           setErr(ev.message);
+          setSynthesizing(false);
           setPending(false);
           break;
       }
@@ -221,6 +298,8 @@ function AnalyzePage() {
       </div>
 
       <TerminalLog lines={lines} />
+
+      <PipelineStatus pipeline={pipeline} synthesizing={synthesizing} />
 
       {err && (
         <div className="rounded-xl border border-rose-700 bg-rose-950/40 p-6 text-rose-100">
@@ -342,11 +421,7 @@ function AnalyzePage() {
                   className="mt-2 text-sm text-[var(--bunq-text)]/90"
                 />
                 {u.key_claims && u.key_claims.length > 0 && (
-                  <ul className="mt-2 space-y-0.5 text-xs text-[var(--bunq-muted)]">
-                    {u.key_claims.map((c, i) => (
-                      <li key={i}>· {c}</li>
-                    ))}
-                  </ul>
+                  <UserSourceClaims claims={u.key_claims} />
                 )}
               </div>
             ))}

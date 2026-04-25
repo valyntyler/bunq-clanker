@@ -155,7 +155,10 @@ function FlagList({
       </div>
       <ul className="mt-1 space-y-0.5 text-[11px] leading-snug text-[var(--bunq-text)]/85">
         {items.map((it, i) => (
-          <li key={i}>· {it}</li>
+          <li key={i} className="flex gap-1.5">
+            <span className="opacity-60">·</span>
+            <Markdown text={it} inline />
+          </li>
         ))}
       </ul>
     </div>

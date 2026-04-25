@@ -253,6 +253,87 @@ export async function uploadEvidence(args: {
   );
 }
 
+export type UploadStepStatus = "running" | "done" | "skipped" | "error";
+export interface UploadStepEvent {
+  step:
+    | "compress"
+    | "upload"
+    | "audio_extract"
+    | "frame_grid"
+    | "prosody"
+    | "transcribe"
+    | "pdf_extract"
+    | "text_analyze"
+    | "vision_claude";
+  status: UploadStepStatus;
+  detail?: Record<string, unknown>;
+}
+
+/** Stream upload: invokes onStep per stage; resolves with the final UserSource. */
+export async function uploadEvidenceStream(args: {
+  ticker: string;
+  companyName?: string;
+  sourceType: UploadKind;
+  file: File;
+  userNote?: string;
+  userTag?: EvidenceTag;
+  onStep: (ev: UploadStepEvent) => void;
+  signal?: AbortSignal;
+}): Promise<UserSource> {
+  const fd = new FormData();
+  fd.set("ticker", args.ticker);
+  if (args.companyName) fd.set("company_name", args.companyName);
+  fd.set("source_type", args.sourceType);
+  fd.set("user_note", args.userNote ?? "");
+  fd.set("user_tag", args.userTag ?? "neutral");
+  fd.set("file", args.file);
+
+  const r = await authFetch(`${BACKEND_URL}/evidence/upload/stream`, {
+    method: "POST",
+    body: fd,
+    signal: args.signal,
+  });
+  if (!r.ok || !r.body) {
+    throw new Error(`upload stream failed: ${r.status} ${r.statusText}`);
+  }
+  const reader = r.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let result: UserSource | null = null;
+  let error: string | null = null;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    let idx;
+    while ((idx = buffer.indexOf("\n\n")) >= 0) {
+      const chunk = buffer.slice(0, idx);
+      buffer = buffer.slice(idx + 2);
+      for (const line of chunk.split("\n")) {
+        if (!line.startsWith("data: ")) continue;
+        const payload = line.slice(6).trim();
+        if (!payload) continue;
+        try {
+          const ev = JSON.parse(payload);
+          if (ev.step) {
+            args.onStep(ev as UploadStepEvent);
+          } else if (ev.result) {
+            result = ev.result as UserSource;
+          } else if (ev.error) {
+            error = ev.error;
+          }
+        } catch {
+          // ignore parse errors
+        }
+      }
+    }
+  }
+  if (error) throw new Error(error);
+  if (!result) throw new Error("upload completed without a result");
+  return result;
+}
+
 export interface ResynthesizeRequest {
   ticker: string;
   company_name: string;

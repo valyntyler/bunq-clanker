@@ -71,16 +71,37 @@ def analyze_user_video(
     user_tag: UserTag = "neutral",
     filename: str | None = None,
     is_audio_only: bool = False,
+    on_step=None,
 ) -> UserSource:
+    """on_step(step_name, status, detail=None) — emits stage events:
+        ("upload", "running")
+        ("upload", "done")
+        ("audio_extract", "running" / "done" / "skipped")
+        ("frame_grid",   "running" / "done" / "skipped")
+        ("prosody",      "running" / "done" / "skipped")
+        ("transcribe",   "running" / "done")
+        ("vision_claude","running" / "done")
+    """
+
+    def _step(name: str, status: str, detail: dict | None = None) -> None:
+        if on_step is not None:
+            try:
+                on_step(name, status, detail)
+            except Exception:  # noqa: BLE001
+                log.exception("on_step callback failed")
+
     sid = f"user-{uuid.uuid4().hex[:8]}"
     ext = "m4a" if is_audio_only else "mp4"
     media_key = f"user-evidence/{sid}.{ext}"
+
+    _step("upload", "running")
     media_url = put_and_sign(
         media_key,
         video_bytes,
         content_type=content_type or ("audio/m4a" if is_audio_only else "video/mp4"),
         expires_s=7 * 24 * 3600,
     )
+    _step("upload", "done", {"bytes": len(video_bytes)})
 
     with tempfile.TemporaryDirectory(prefix="user-video-") as td:
         tmp = Path(td)
@@ -95,18 +116,33 @@ def analyze_user_video(
             duration = 0.0
 
         # audio extract + prosody
+        _step("audio_extract", "running")
         try:
             extract_audio_wav(media_path, wav)
-            pros = prosody_features(wav)
+            _step("audio_extract", "done")
         except Exception:  # noqa: BLE001
             log.exception("audio extract failed; will skip prosody")
-            pros = {}
             wav = None  # type: ignore[assignment]
+            _step("audio_extract", "error")
+
+        pros: dict = {}
+        if wav is not None:
+            _step("prosody", "running")
+            try:
+                pros = prosody_features(wav)
+                _step("prosody", "done", {
+                    "pitch_mean_hz": pros.get("pitch_mean_hz"),
+                    "duration_s": pros.get("duration_s"),
+                })
+            except Exception:  # noqa: BLE001
+                log.exception("prosody failed")
+                _step("prosody", "error")
 
         # frame grid only for video
         grid_url: str | None = None
         grid_bytes = b""
         if not is_audio_only:
+            _step("frame_grid", "running")
             try:
                 frame_grid(media_path, grid, n=9)
                 grid_bytes = grid.read_bytes()
@@ -116,8 +152,12 @@ def analyze_user_video(
                     content_type="image/png",
                     expires_s=7 * 24 * 3600,
                 )
+                _step("frame_grid", "done", {"bytes": len(grid_bytes)})
             except Exception:  # noqa: BLE001
                 log.exception("frame grid failed")
+                _step("frame_grid", "error")
+        else:
+            _step("frame_grid", "skipped")
 
         # transcribe via AWS (sync, polled)
         transcript = ""
@@ -125,10 +165,15 @@ def analyze_user_video(
             audio_key = f"user-evidence/{sid}.wav"
             put_bytes(audio_key, wav.read_bytes(), content_type="audio/wav")
             audio_uri = f"s3://{BUCKET}/{audio_key}"
+            _step("transcribe", "running")
             try:
                 transcript = transcribe_via_aws(audio_uri)
+                _step("transcribe", "done", {"chars": len(transcript)})
             except Exception:  # noqa: BLE001
                 log.exception("transcribe failed")
+                _step("transcribe", "error")
+        else:
+            _step("transcribe", "skipped")
 
     pros_lines = "\n".join(
         f"  {k} = {v}" for k, v in (pros or {}).items()
@@ -160,7 +205,9 @@ Return STRICT JSON:
 }}
 """
     images = [grid_bytes] if grid_bytes else []
+    _step("vision_claude", "running")
     out = call_claude_json(user, system=SYSTEM, images=images, max_tokens=900)
+    _step("vision_claude", "done")
 
     summary = out.get("summary", "")
     # Pack the multimodal layers into key_claims for display

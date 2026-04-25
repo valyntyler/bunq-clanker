@@ -52,16 +52,26 @@ def analyze_user_image(
     user_note: str = "",
     user_tag: UserTag = "neutral",
     filename: str | None = None,
+    on_step=None,
 ) -> UserSource:
+    def _step(name: str, status: str, detail: dict | None = None) -> None:
+        if on_step is not None:
+            try:
+                on_step(name, status, detail)
+            except Exception:
+                pass
+
     sid = f"user-{uuid.uuid4().hex[:8]}"
     ext = _ext_for(content_type)
     key = f"user-evidence/{sid}.{ext}"
+    _step("upload", "running")
     presigned = put_and_sign(
         key,
         image_bytes,
         content_type=content_type or "image/png",
         expires_s=7 * 24 * 3600,
     )
+    _step("upload", "done", {"bytes": len(image_bytes)})
 
     label = filename or f"image.{ext}"
     user = f"""You are evaluating an image uploaded by the user as evidence for ticker {ticker}{f' ({company_name})' if company_name else ''}.
@@ -83,7 +93,9 @@ Return STRICT JSON:
   "key_claims": string[] (max 3, claims a reasonable analyst would derive)
 }}
 """
+    _step("vision_claude", "running")
     out = call_claude_json(user, system=SYSTEM, images=[image_bytes], max_tokens=600)
+    _step("vision_claude", "done")
 
     return UserSource(
         source_id=sid,

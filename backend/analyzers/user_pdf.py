@@ -28,16 +28,28 @@ def analyze_user_pdf(
     user_note: str = "",
     user_tag: UserTag = "neutral",
     filename: str | None = None,
+    on_step=None,
 ) -> UserSource:
+    def _step(name: str, status: str, detail: dict | None = None) -> None:
+        if on_step is not None:
+            try:
+                on_step(name, status, detail)
+            except Exception:
+                pass
+
     sid = f"user-{uuid.uuid4().hex[:8]}"
+    _step("upload", "running")
     pdf_url = put_and_sign(
         f"user-evidence/{sid}.pdf",
         pdf_bytes,
         content_type="application/pdf",
         expires_s=7 * 24 * 3600,
     )
+    _step("upload", "done", {"bytes": len(pdf_bytes)})
 
+    _step("pdf_extract", "running")
     text = _extract_text(pdf_bytes)
+    _step("pdf_extract", "done", {"chars": len(text)})
     if not text.strip():
         # Empty PDF — return a minimal source rather than 500ing
         return UserSource(
@@ -52,6 +64,7 @@ def analyze_user_pdf(
             trust_level="low",
         )
 
+    _step("text_analyze", "running")
     src = analyze_user_text(
         ticker=ticker,
         company_name=company_name,
@@ -62,6 +75,7 @@ def analyze_user_pdf(
         user_tag=user_tag,
         source_type="pdf",
     )
+    _step("text_analyze", "done")
     # Override source_id + origin to match the PDF artefact instead of the text wrapper
     src.source_id = sid
     src.origin = pdf_url

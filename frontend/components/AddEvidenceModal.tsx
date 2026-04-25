@@ -3,11 +3,46 @@
 import { useState } from "react";
 import {
   submitEvidence,
-  uploadEvidence,
+  uploadEvidenceStream,
   type EvidenceTag,
   type UploadKind,
+  type UploadStepEvent,
   type UserSource,
 } from "@/lib/api";
+
+const STEP_LABEL: Record<UploadStepEvent["step"], string> = {
+  compress: "Compressing with ffmpeg",
+  upload: "Uploading to S3",
+  audio_extract: "Extracting audio (ffmpeg)",
+  frame_grid: "Sampling 9 frames into a grid",
+  prosody: "Computing prosody (librosa)",
+  transcribe: "Transcribing audio (AWS Transcribe)",
+  pdf_extract: "Extracting text (PyMuPDF)",
+  text_analyze: "Analyzing text",
+  vision_claude: "Multimodal Claude analysis",
+};
+
+const STEP_ORDER_BY_TAB: Record<UploadKind, UploadStepEvent["step"][]> = {
+  image: ["compress", "upload", "vision_claude"],
+  video: [
+    "compress",
+    "upload",
+    "audio_extract",
+    "prosody",
+    "frame_grid",
+    "transcribe",
+    "vision_claude",
+  ],
+  audio: [
+    "compress",
+    "upload",
+    "audio_extract",
+    "prosody",
+    "transcribe",
+    "vision_claude",
+  ],
+  pdf: ["upload", "pdf_extract", "text_analyze"],
+};
 
 type Tab = "url" | "text" | "image" | "video" | "audio" | "pdf";
 
@@ -61,6 +96,9 @@ export function AddEvidenceModal({
   const [tag, setTag] = useState<EvidenceTag>("neutral");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [stepStatus, setStepStatus] = useState<
+    Record<string, { status: UploadStepEvent["status"]; detail?: Record<string, unknown> }>
+  >({});
 
   if (!open) return null;
 
@@ -72,11 +110,13 @@ export function AddEvidenceModal({
     setTag("neutral");
     setError(null);
     setPending(false);
+    setStepStatus({});
   }
 
   async function submit() {
     setPending(true);
     setError(null);
+    setStepStatus({});
     try {
       let src: UserSource;
       if (tab === "url") {
@@ -104,13 +144,18 @@ export function AddEvidenceModal({
           throw new Error(
             `${file.name} is ${(file.size / (1024 * 1024)).toFixed(1)}MB — max ${MAX_MB[tab]}MB`
           );
-        src = await uploadEvidence({
+        src = await uploadEvidenceStream({
           ticker,
           companyName,
           sourceType: tab as UploadKind,
           file,
           userNote: note.trim(),
           userTag: tag,
+          onStep: (ev) =>
+            setStepStatus((prev) => ({
+              ...prev,
+              [ev.step]: { status: ev.status, detail: ev.detail },
+            })),
         });
       }
       onAdded(src);
@@ -272,6 +317,74 @@ export function AddEvidenceModal({
           </select>
         </div>
 
+        {pending && (tab === "image" || tab === "video" || tab === "audio" || tab === "pdf") && (
+          <div
+            className="mt-4 rounded-2xl p-3"
+            style={{
+              background: "var(--bunq-surface-2)",
+              border: "1px solid var(--bunq-border)",
+            }}
+          >
+            <div className="font-mono text-[9px] uppercase tracking-[0.18em] text-[var(--bunq-faint)]">
+              Pipeline
+            </div>
+            <ul className="mt-2 space-y-1.5">
+              {STEP_ORDER_BY_TAB[tab].map((step) => {
+                const s = stepStatus[step];
+                const status = s?.status;
+                const glyph =
+                  status === "running"
+                    ? "⟳"
+                    : status === "done"
+                      ? "✓"
+                      : status === "skipped"
+                        ? "·"
+                        : status === "error"
+                          ? "✗"
+                          : "○";
+                const color =
+                  status === "running"
+                    ? "var(--bunq-green)"
+                    : status === "done"
+                      ? "var(--bunq-green)"
+                      : status === "error"
+                        ? "var(--bunq-bad)"
+                        : status === "skipped"
+                          ? "var(--bunq-faint)"
+                          : "var(--bunq-faint)";
+                return (
+                  <li key={step} className="flex items-center gap-2 text-xs">
+                    <span
+                      className={`bunq-numeral inline-flex h-4 w-4 items-center justify-center font-mono ${
+                        status === "running" ? "animate-spin" : ""
+                      }`}
+                      style={{ color }}
+                    >
+                      {glyph}
+                    </span>
+                    <span
+                      className="flex-1"
+                      style={{
+                        color:
+                          status === "done" || status === "running"
+                            ? "var(--bunq-text)"
+                            : "var(--bunq-muted)",
+                      }}
+                    >
+                      {STEP_LABEL[step]}
+                    </span>
+                    {s?.detail && status === "done" && (
+                      <span className="bunq-numeral font-mono text-[10px] text-[var(--bunq-faint)]">
+                        {detailLabel(step, s.detail)}
+                      </span>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
+
         {error && (
           <div
             className="mt-3 rounded-xl p-2 text-xs"
@@ -312,6 +425,35 @@ export function AddEvidenceModal({
       </div>
     </div>
   );
+}
+
+function detailLabel(
+  step: UploadStepEvent["step"],
+  d: Record<string, unknown>
+): string {
+  if (step === "compress") {
+    const inB = d.in_bytes as number | undefined;
+    const outB = d.out_bytes as number | undefined;
+    if (inB && outB) {
+      return `${(inB / 1024).toFixed(0)}KB → ${(outB / 1024).toFixed(0)}KB`;
+    }
+  }
+  if (step === "upload" && typeof d.bytes === "number") {
+    return `${(d.bytes / 1024).toFixed(0)}KB`;
+  }
+  if (step === "transcribe" && typeof d.chars === "number") {
+    return `${d.chars} chars`;
+  }
+  if (step === "prosody" && typeof d.pitch_mean_hz === "number") {
+    return `${(d.pitch_mean_hz as number).toFixed(0)} Hz`;
+  }
+  if (step === "frame_grid" && typeof d.bytes === "number") {
+    return `${(d.bytes / 1024).toFixed(0)}KB`;
+  }
+  if (step === "pdf_extract" && typeof d.chars === "number") {
+    return `${d.chars} chars`;
+  }
+  return "";
 }
 
 function FileTab({

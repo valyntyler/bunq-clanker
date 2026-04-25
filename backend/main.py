@@ -450,16 +450,52 @@ async def evidence_upload(
     if user_tag not in ("supporting", "contradicting", "neutral"):
         user_tag = "neutral"
 
-    src: UserSource | None = None
+    src = await _run_upload_analyzer(
+        source_type=source_type,
+        content=content,
+        ticker=ticker,
+        company_name=company_name,
+        user_note=user_note,
+        user_tag=user_tag,
+        filename=file.filename,
+        on_step=None,
+    )
+    _persist_user_evidence(session, user, src, ticker, company_name)
+    return src
+
+
+async def _run_upload_analyzer(
+    *,
+    source_type: str,
+    content: bytes,
+    ticker: str,
+    company_name: str | None,
+    user_note: str,
+    user_tag: str,
+    filename: str | None,
+    on_step,
+) -> UserSource:
+    """Shared body of /evidence/upload and /evidence/upload/stream — runs
+    compression + the right analyzer with an optional step callback."""
+
+    def _emit(name: str, status: str, detail: dict | None = None) -> None:
+        if on_step is not None:
+            on_step(name, status, detail)
 
     if source_type == "image":
+        _emit("compress", "running")
         compressed, ctype, stats = await asyncio.to_thread(compress_image, content)
         log.info(
             "compress image %s: %d→%d bytes (%.1f%%) in %.1fs [%s]",
-            file.filename, stats["in_bytes"], stats["out_bytes"],
+            filename, stats["in_bytes"], stats["out_bytes"],
             100 * stats["ratio"], stats["elapsed_s"], stats["format"],
         )
-        src = await asyncio.to_thread(
+        _emit("compress", "done", {
+            "in_bytes": stats["in_bytes"],
+            "out_bytes": stats["out_bytes"],
+            "ratio": stats["ratio"],
+        })
+        return await asyncio.to_thread(
             analyze_user_image,
             ticker=ticker,
             company_name=company_name,
@@ -467,16 +503,23 @@ async def evidence_upload(
             content_type=ctype,
             user_note=user_note,
             user_tag=user_tag,  # type: ignore[arg-type]
-            filename=file.filename,
+            filename=filename,
+            on_step=on_step,
         )
-    elif source_type == "video":
+    if source_type == "video":
+        _emit("compress", "running")
         compressed, ctype, stats = await asyncio.to_thread(compress_video, content)
         log.info(
             "compress video %s: %d→%d bytes (%.1f%%) in %.1fs [%s]",
-            file.filename, stats["in_bytes"], stats["out_bytes"],
+            filename, stats["in_bytes"], stats["out_bytes"],
             100 * stats["ratio"], stats["elapsed_s"], stats["format"],
         )
-        src = await asyncio.to_thread(
+        _emit("compress", "done", {
+            "in_bytes": stats["in_bytes"],
+            "out_bytes": stats["out_bytes"],
+            "ratio": stats["ratio"],
+        })
+        return await asyncio.to_thread(
             analyze_user_video,
             ticker=ticker,
             company_name=company_name,
@@ -484,17 +527,24 @@ async def evidence_upload(
             content_type=ctype,
             user_note=user_note,
             user_tag=user_tag,  # type: ignore[arg-type]
-            filename=file.filename,
+            filename=filename,
             is_audio_only=False,
+            on_step=on_step,
         )
-    elif source_type == "audio":
+    if source_type == "audio":
+        _emit("compress", "running")
         compressed, ctype, stats = await asyncio.to_thread(compress_audio, content)
         log.info(
             "compress audio %s: %d→%d bytes (%.1f%%) in %.1fs [%s]",
-            file.filename, stats["in_bytes"], stats["out_bytes"],
+            filename, stats["in_bytes"], stats["out_bytes"],
             100 * stats["ratio"], stats["elapsed_s"], stats["format"],
         )
-        src = await asyncio.to_thread(
+        _emit("compress", "done", {
+            "in_bytes": stats["in_bytes"],
+            "out_bytes": stats["out_bytes"],
+            "ratio": stats["ratio"],
+        })
+        return await asyncio.to_thread(
             analyze_user_video,
             ticker=ticker,
             company_name=company_name,
@@ -502,25 +552,107 @@ async def evidence_upload(
             content_type=ctype,
             user_note=user_note,
             user_tag=user_tag,  # type: ignore[arg-type]
-            filename=file.filename,
+            filename=filename,
             is_audio_only=True,
+            on_step=on_step,
         )
-    elif source_type == "pdf":
-        log.info("pdf %s: %d bytes (no compression)", file.filename, len(content))
-        src = await asyncio.to_thread(
+    if source_type == "pdf":
+        log.info("pdf %s: %d bytes (no compression)", filename, len(content))
+        _emit("compress", "skipped")
+        return await asyncio.to_thread(
             analyze_user_pdf,
             ticker=ticker,
             company_name=company_name,
             pdf_bytes=content,
             user_note=user_note,
             user_tag=user_tag,  # type: ignore[arg-type]
-            filename=file.filename,
+            filename=filename,
+            on_step=on_step,
         )
-    else:
-        raise HTTPException(500, f"unhandled source_type {source_type}")
+    raise HTTPException(500, f"unhandled source_type {source_type}")
 
-    _persist_user_evidence(session, user, src, ticker, company_name)
-    return src
+
+@app.post("/evidence/upload/stream")
+async def evidence_upload_stream(
+    ticker: str = Form(...),
+    source_type: str = Form(...),
+    user_note: str = Form(""),
+    user_tag: str = Form("neutral"),
+    company_name: str | None = Form(None),
+    file: UploadFile = File(...),
+    user: User = Depends(require_user),
+    session: Session = Depends(get_session),
+) -> StreamingResponse:
+    """Same as /evidence/upload but streams stage events as SSE.
+
+    Events:
+        {"step": <name>, "status": "running" | "done" | "skipped" | "error",
+         "detail": {...}}
+        {"result": UserSource}
+        {"error": str}
+    """
+    if source_type not in MAX_UPLOAD_BYTES:
+        raise HTTPException(400, f"unsupported source_type {source_type}")
+    content = await file.read()
+    if not content:
+        raise HTTPException(400, "empty upload")
+    if len(content) > MAX_UPLOAD_BYTES[source_type]:
+        raise HTTPException(
+            413,
+            f"file too large for source_type={source_type} "
+            f"(>{MAX_UPLOAD_BYTES[source_type] // (1024 * 1024)}MB)",
+        )
+    if user_tag not in ("supporting", "contradicting", "neutral"):
+        user_tag = "neutral"
+
+    queue: asyncio.Queue[dict] = asyncio.Queue()
+    loop = asyncio.get_event_loop()
+
+    def on_step(name: str, status: str, detail: dict | None = None) -> None:
+        # Step callbacks fire from a worker thread; schedule on the main loop.
+        ev = {"step": name, "status": status}
+        if detail:
+            ev["detail"] = detail
+        loop.call_soon_threadsafe(queue.put_nowait, ev)
+
+    async def run_and_finish() -> None:
+        try:
+            src = await _run_upload_analyzer(
+                source_type=source_type,
+                content=content,
+                ticker=ticker,
+                company_name=company_name,
+                user_note=user_note,
+                user_tag=user_tag,
+                filename=file.filename,
+                on_step=on_step,
+            )
+            _persist_user_evidence(session, user, src, ticker, company_name)
+            await queue.put({"result": src.model_dump()})
+        except Exception as e:  # noqa: BLE001
+            log.exception("evidence_upload_stream failed")
+            await queue.put({"error": str(e)})
+        finally:
+            await queue.put({"_done": True})
+
+    asyncio.create_task(run_and_finish())
+
+    async def event_gen():
+        while True:
+            ev = await queue.get()
+            if ev.get("_done"):
+                return
+            yield f"data: {_json.dumps(ev)}\n\n"
+
+    return StreamingResponse(
+        event_gen(),
+        media_type="text/event-stream",
+        headers={
+            "cache-control": "no-cache",
+            "x-accel-buffering": "no",
+            "connection": "keep-alive",
+        },
+    )
 
 
 @app.post("/evidence", response_model=UserSource)
