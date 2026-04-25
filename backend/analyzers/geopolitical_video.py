@@ -24,7 +24,8 @@ from typing import Any
 import httpx
 
 from backend.llm import call_claude_json
-from backend.models import GeopoliticalOverlay
+from backend.models import AuthenticityReport, GeopoliticalOverlay
+from backend.services.audio_authenticity import assess_authenticity
 
 log = logging.getLogger("prospectus.geopolitical_video")
 
@@ -173,11 +174,20 @@ async def analyze_geopolitical_video(
             relevance = float(res.get("relevance", 0))
             if relevance < 0.3:
                 continue
+            # Verified-human / deepfake check. We feed both the source URL
+            # (for trusted-channel verification) and the prosody features
+            # we already extracted. Cheap — runs in microseconds per clip.
+            auth_dict = assess_authenticity(
+                source_url=clip.get("source_url"),
+                prosody=clip.get("prosody"),
+            ).to_dict()
+            authenticity = AuthenticityReport(**auth_dict)
             overlays.append(
                 GeopoliticalOverlay(
                     event_id=clip["event_id"],
                     speaker=clip.get("speaker", "unknown"),
                     clip_url=clip.get("clip_url"),
+                    source_url=clip.get("source_url"),
                     relevance=relevance,
                     impact_direction=int(res.get("impact_direction", 0)),
                     impact_magnitude=float(res.get("impact_magnitude", 0)),
@@ -185,6 +195,7 @@ async def analyze_geopolitical_video(
                     tone_notes=res.get("tone_notes", "")[:200],
                     visual_notes=res.get("visual_notes", "")[:200],
                     reasoning=res.get("reasoning", ""),
+                    authenticity=authenticity,
                 )
             )
         except (TypeError, ValueError, KeyError):

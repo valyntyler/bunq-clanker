@@ -47,7 +47,13 @@ Rules:
 2. Consumer panel data is the most predictive non-filing signal. Always cite it
    in the verdict narrative. If the panel trend contradicts fundamentals, FLAG
    the disagreement prominently — that's the product's core value.
-3. Geopolitical overlays can override fundamentals when relevance >= 0.7.
+3. Geopolitical overlays can override fundamentals when relevance >= 0.7,
+   BUT only if the overlay's `authenticity.score` >= 0.6. If `authenticity.score`
+   is < 0.5 the overlay must be down-weighted (treat its impact_magnitude as
+   if multiplied by 0.3) and you must mention the lack of source verification
+   in the narrative — never let an unverified clip dominate the verdict.
+   If `authenticity.label` is "likely_synthetic", drop the overlay entirely
+   and surface it under data_gaps as "deepfake-suspected clip excluded".
 4. User-provided sources are supplementary. Cap their combined weight at 20%.
    Regulatory filings win when they conflict.
 5. The personal Bunq spending overlay is a conviction/behavioural signal, not
@@ -132,6 +138,15 @@ def synthesize(
                 f"relevance={g.relevance:.2f} direction={g.impact_direction} "
                 f"magnitude={g.impact_magnitude:.2f}"
             )
+            if g.authenticity:
+                a = g.authenticity
+                parts.append(
+                    f"  authenticity={a.label} score={a.score:.2f} "
+                    f"source_verified={a.source_verified}"
+                    + (f" ({a.source_label})" if a.source_label else "")
+                )
+                if a.flags:
+                    parts.append(f"  authenticity_flags: {' | '.join(a.flags)}")
             parts.append(f"  reasoning: {g.reasoning}")
         parts.append("")
 

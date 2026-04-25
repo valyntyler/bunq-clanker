@@ -16,12 +16,13 @@ Hard ethical guardrails (in the system prompt):
 from __future__ import annotations
 
 from backend.llm import call_claude_json
-from backend.models import GeopoliticalOverlay
+from backend.models import AuthenticityReport, GeopoliticalOverlay
 from backend.scrapers.geopolitical_monitor import (
     GeoEvent,
     fetch_recent_events,
     format_for_claude,
 )
+from backend.services.audio_authenticity import assess_authenticity
 
 # Minimal hint fallback so geopolitical works even when called with just a
 # ticker (e.g. before fundamentals resolves). Pairs ticker -> short sector
@@ -122,6 +123,14 @@ Return STRICT JSON: {{"overlays": [
         if ev is None:
             continue
         try:
+            # Text-only events have no audio to fingerprint; we still rate
+            # the source. A trusted outlet (Reuters/AP/Bloomberg/.gov) gets
+            # a verified-source badge; an unknown aggregator stays in the
+            # uncertain bucket so the synthesizer treats it more cautiously.
+            auth_dict = assess_authenticity(
+                source_url=ev.source_url, prosody=None
+            ).to_dict()
+            authenticity = AuthenticityReport(**auth_dict)
             overlays.append(
                 GeopoliticalOverlay(
                     event_id=ev.event_id,
@@ -135,6 +144,7 @@ Return STRICT JSON: {{"overlays": [
                     tone_notes="",
                     visual_notes="",
                     reasoning=item["reasoning"],
+                    authenticity=authenticity,
                 )
             )
         except (KeyError, ValueError, TypeError):

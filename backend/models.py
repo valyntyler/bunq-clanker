@@ -20,6 +20,22 @@ class Section(BaseModel):
     extra: dict[str, Any] = {}
 
 
+class AuthenticityReport(BaseModel):
+    """Verified-human / deepfake check on a media clip. The synthesizer
+    de-weights overlays whose score is < 0.5; the UI surfaces the label
+    and reasoning so a user can see WHY a clip was trusted or doubted."""
+
+    score: float = Field(ge=0, le=1)
+    label: Literal[
+        "verified", "likely_real", "uncertain", "likely_synthetic"
+    ]
+    source_verified: bool
+    source_label: str | None = None
+    method: Literal["source+prosody", "source-only", "prosody-only", "none"]
+    flags: list[str] = []
+    reasoning: str = ""
+
+
 class GeopoliticalOverlay(BaseModel):
     event_id: str
     speaker: str
@@ -32,6 +48,7 @@ class GeopoliticalOverlay(BaseModel):
     tone_notes: str = ""
     visual_notes: str = ""
     reasoning: str
+    authenticity: AuthenticityReport | None = None
 
 
 class UserSource(BaseModel):

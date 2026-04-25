@@ -67,6 +67,22 @@ export interface BunqSpendingOverlay {
   geo_signal?: string;
 }
 
+export type AuthenticityLabel =
+  | "verified"
+  | "likely_real"
+  | "uncertain"
+  | "likely_synthetic";
+
+export interface AuthenticityReport {
+  score: number;
+  label: AuthenticityLabel;
+  source_verified: boolean;
+  source_label?: string | null;
+  method: "source+prosody" | "source-only" | "prosody-only" | "none";
+  flags?: string[];
+  reasoning?: string;
+}
+
 export interface GeopoliticalOverlay {
   event_id: string;
   speaker: string;
@@ -79,6 +95,7 @@ export interface GeopoliticalOverlay {
   tone_notes?: string;
   visual_notes?: string;
   reasoning: string;
+  authenticity?: AuthenticityReport | null;
 }
 
 export interface UserSource {

@@ -1,7 +1,7 @@
 "use client";
 
 import { Markdown } from "@/components/Markdown";
-import type { GeopoliticalOverlay } from "@/lib/api";
+import type { AuthenticityReport, GeopoliticalOverlay } from "@/lib/api";
 
 /**
  * Compact card for one geopolitical overlay. Two layouts:
@@ -98,6 +98,7 @@ export function GeopoliticalOverlayCard({
                     {sourceHost} ↗
                   </a>
                 )}
+                {g.authenticity && <AuthenticityChip a={g.authenticity} />}
               </div>
               <div
                 className="mt-1 truncate font-mono text-[10px] text-[var(--bunq-faint)]"
@@ -224,4 +225,64 @@ function safeHost(url: string): string | null {
   } catch {
     return null;
   }
+}
+
+function AuthenticityChip({ a }: { a: AuthenticityReport }) {
+  // Four states. Verified is the strong-positive (green check), uncertain
+  // is amber, likely_synthetic is red — the user should immediately see
+  // when an overlay didn't pass the deepfake check.
+  const styleByLabel: Record<
+    AuthenticityReport["label"],
+    { bg: string; fg: string; border: string; glyph: string; label: string }
+  > = {
+    verified: {
+      bg: "rgba(181,255,0,0.10)",
+      fg: "var(--bunq-green)",
+      border: "rgba(181,255,0,0.35)",
+      glyph: "✓",
+      label: "verified source",
+    },
+    likely_real: {
+      bg: "rgba(181,255,0,0.06)",
+      fg: "var(--bunq-green)",
+      border: "rgba(181,255,0,0.22)",
+      glyph: "✓",
+      label: "likely real",
+    },
+    uncertain: {
+      bg: "rgba(255,183,77,0.08)",
+      fg: "var(--bunq-warn)",
+      border: "rgba(255,183,77,0.30)",
+      glyph: "?",
+      label: "unverified",
+    },
+    likely_synthetic: {
+      bg: "var(--bunq-bad-soft)",
+      fg: "var(--bunq-bad)",
+      border: "rgba(255,90,90,0.30)",
+      glyph: "✗",
+      label: "deepfake-suspected",
+    },
+  };
+  const s = styleByLabel[a.label];
+  const tooltipParts: string[] = [
+    a.source_verified
+      ? `Source verified: ${a.source_label ?? "trusted channel"}.`
+      : "Source not on the verified-channels list.",
+    `Method: ${a.method}.`,
+    `Score: ${(a.score * 100).toFixed(0)}/100.`,
+  ];
+  if (a.flags && a.flags.length > 0) {
+    tooltipParts.push("Flags: " + a.flags.join(" · "));
+  }
+  return (
+    <span
+      className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.16em]"
+      style={{ background: s.bg, color: s.fg, border: `1px solid ${s.border}` }}
+      title={tooltipParts.join(" ")}
+    >
+      <span aria-hidden>{s.glyph}</span>
+      {s.label}
+    </span>
+  );
 }

@@ -178,11 +178,11 @@ const REGISTRY: Record<ProvenanceKind, ProvenanceMeta> = {
   },
   geopolitical_overlay: {
     label: "Geopolitical clip",
-    what: "Statements from market-moving figures (heads of state, central bankers, regulators) scored for impact on this ticker.",
+    what: "Statements from market-moving figures (heads of state, central bankers, regulators) scored for impact on this ticker. Each overlay also carries a verified-human / deepfake check.",
     source:
-      "Pre-seeded clip library (yt-dlp from official channels) + live Google News RSS poller for new items.",
+      "Pre-seeded clip library (yt-dlp from official channels) + live Google News RSS poller for new items. Authenticity registry: WhiteHouse / ECB / EU Commission / IMF / UN / Fed YouTube channel IDs + Reuters / AP / Bloomberg / BBC / FT / WSJ / .gov domains.",
     method:
-      "Audio → AWS Transcribe + librosa prosody. Video → ffmpeg 9-frame grid → Claude vision (observable behaviour only). Per-clip relevance + impact scored by Claude.",
+      "Audio → AWS Transcribe + librosa prosody. Video → ffmpeg 9-frame grid → Claude vision (observable behaviour only). Per-clip relevance + impact scored by Claude. Authenticity = trusted-source check (binary) ⊕ prosody fingerprint (pitch jitter + energy variability + silence fraction); synthesizer down-weights overlays scoring < 0.5 and drops 'likely_synthetic' clips entirely.",
     freshness: "Library: trailing 30 days · live monitor: last 5-min poll.",
   },
   geopolitical_live: {
