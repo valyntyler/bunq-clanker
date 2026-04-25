@@ -116,7 +116,7 @@ function ReceiptsPage() {
       {result && (
         <>
           <ReceiptHeader r={result} />
-          <Tabs tab={tab} onChange={setTab} canSplit={result.is_recent} />
+          <Tabs tab={tab} onChange={setTab} isRecent={result.is_recent} />
           {tab === "spend" && <SpendTab r={result} />}
           {tab === "split" && (
             <SplitTab r={result} />
@@ -375,11 +375,13 @@ function Uploader({
 function Tabs({
   tab,
   onChange,
-  canSplit,
+  isRecent,
 }: {
   tab: Tab;
   onChange: (t: Tab) => void;
-  canSplit: boolean;
+  /** Recent receipts auto-flip to Split on upload; older ones can still
+   *  be split manually — we just don't auto-switch. */
+  isRecent: boolean;
 }) {
   return (
     <div
@@ -398,8 +400,9 @@ function Tabs({
       <TabButton
         active={tab === "split"}
         onClick={() => onChange("split")}
-        label={canSplit ? "Split with friends" : "Split (recent only)"}
-        disabled={!canSplit}
+        label={
+          isRecent ? "Split with friends" : "Split with friends · archive"
+        }
       />
     </div>
   );
@@ -833,6 +836,23 @@ function SplitTab({ r }: { r: ReceiptResult }) {
 
   return (
     <section className="space-y-4">
+      {!r.is_recent && (
+        <div
+          className="rounded-2xl p-3 text-xs"
+          style={{
+            background: "var(--bunq-surface-2)",
+            border: "1px solid var(--bunq-border)",
+            color: "var(--bunq-muted)",
+          }}
+        >
+          <span className="font-mono uppercase tracking-[0.18em] text-[var(--bunq-faint)]">
+            archive split ·
+          </span>{" "}
+          this receipt is from {r.date || "an earlier date"}. Splits still
+          fire as Bunq payment requests, but recipients may not recognise
+          the charge — add a note or talk to them first.
+        </div>
+      )}
       <div
         className="rounded-2xl p-4"
         style={{
