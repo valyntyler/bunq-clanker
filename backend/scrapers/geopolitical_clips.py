@@ -126,7 +126,7 @@ def yt_dlp_segment(url: str, start_s: int, duration_s: int, out_mp4: Path) -> No
     out_mp4.parent.mkdir(parents=True, exist_ok=True)
     end_s = start_s + duration_s
     cmd = [
-        "yt-dlp",
+        _yt_dlp_bin(),
         "--no-playlist",
         "--download-sections", f"*{start_s}-{end_s}",
         "--force-keyframes-at-cuts",

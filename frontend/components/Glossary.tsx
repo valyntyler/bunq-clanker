@@ -152,43 +152,43 @@ export function Term({
   term: keyof typeof GLOSSARY | string;
   children: React.ReactNode;
 }) {
-  const [open, setOpen] = useState(false);
+  const [hovered, setHovered] = useState(false);
+  const [focused, setFocused] = useState(false);
   const ref = useRef<HTMLSpanElement>(null);
   const def = lookup(String(term));
+  const open = hovered || focused;
 
   useEffect(() => {
     if (!open) return;
-    const onDoc = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
+      if (e.key === "Escape") setFocused(false);
     };
-    document.addEventListener("mousedown", onDoc);
     document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onDoc);
-      document.removeEventListener("keydown", onKey);
-    };
+    return () => document.removeEventListener("keydown", onKey);
   }, [open]);
 
   return (
-    <span ref={ref} className="relative inline-flex items-baseline gap-1">
+    <span
+      ref={ref}
+      className="relative inline-flex items-baseline gap-1"
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
       <span>{children}</span>
       {def && (
         <button
           type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            setOpen((v) => !v);
-          }}
+          tabIndex={0}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+          onClick={(e) => e.stopPropagation()}
           aria-label={`Explain ${def.title}`}
           className="inline-flex h-3.5 w-3.5 shrink-0 cursor-help items-center justify-center rounded-full text-[8px] font-bold transition hover:opacity-100"
           style={{
             background: "var(--bunq-surface-2)",
             color: "var(--bunq-faint)",
             border: "1px solid var(--bunq-border)",
-            opacity: 0.7,
+            opacity: open ? 1 : 0.7,
           }}
         >
           ?
@@ -197,7 +197,7 @@ export function Term({
       {open && def && (
         <span
           role="tooltip"
-          className="absolute left-0 top-full z-30 mt-1 w-64 rounded-xl p-3 shadow-2xl"
+          className="pointer-events-none absolute left-0 top-full z-30 mt-1 w-64 rounded-xl p-3 shadow-2xl"
           style={{
             background: "var(--bunq-surface)",
             border: "1px solid var(--bunq-border-strong)",

@@ -43,10 +43,12 @@ export function LiveClipSearch({
   const [error, setError] = useState<string | null>(null);
   const [searched, setSearched] = useState(false);
 
-  // Per-result analyze state
+  // Per-result analyze state. errors and "done" markers keyed by id so a
+  // failed ingest leaves a visible error and a successful one shows "Added".
   const [activeId, setActiveId] = useState<string | null>(null);
   const [stages, setStages] = useState<Record<string, UploadStepEvent>>({});
-  const [activeError, setActiveError] = useState<string | null>(null);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [doneIds, setDoneIds] = useState<Record<string, true>>({});
 
   const suggestions = SUGGESTIONS_FOR(companyName || ticker);
 
@@ -71,7 +73,10 @@ export function LiveClipSearch({
     if (activeId) return;
     setActiveId(r.id);
     setStages({});
-    setActiveError(null);
+    setErrors((prev) => {
+      const { [r.id]: _drop, ...rest } = prev;
+      return rest;
+    });
     try {
       const src = await ingestUrlStream({
         url: r.url,
@@ -85,8 +90,9 @@ export function LiveClipSearch({
           setStages((prev) => ({ ...prev, [ev.step]: ev })),
       });
       onIngested?.(src);
+      setDoneIds((prev) => ({ ...prev, [r.id]: true }));
     } catch (e) {
-      setActiveError((e as Error).message);
+      setErrors((prev) => ({ ...prev, [r.id]: (e as Error).message }));
     } finally {
       setActiveId(null);
     }
@@ -181,7 +187,8 @@ export function LiveClipSearch({
                 isActive={activeId === r.id}
                 stages={activeId === r.id ? stages : {}}
                 disabled={activeId !== null && activeId !== r.id}
-                error={activeId === r.id ? activeError : null}
+                error={errors[r.id] ?? null}
+                done={doneIds[r.id] === true}
                 onAnalyze={() => void ingest(r)}
               />
             ))}
@@ -198,6 +205,7 @@ function ResultCard({
   stages,
   disabled,
   error,
+  done,
   onAnalyze,
 }: {
   r: YouTubeSearchResult;
@@ -205,6 +213,7 @@ function ResultCard({
   stages: Record<string, UploadStepEvent>;
   disabled: boolean;
   error: string | null;
+  done: boolean;
   onAnalyze: () => void;
 }) {
   return (
@@ -255,33 +264,54 @@ function ResultCard({
         </div>
 
         {!isActive && (
-          <div className="mt-2 flex gap-2">
-            <button
-              onClick={onAnalyze}
-              disabled={disabled}
-              className="flex-1 rounded-full px-3 py-1 font-mono text-[10px] uppercase tracking-[0.16em] disabled:opacity-40"
-              style={{
-                background: "var(--bunq-green-soft)",
-                color: "var(--bunq-green)",
-                border: "1px solid rgba(181,255,0,0.30)",
-              }}
-            >
-              Analyze
-            </button>
-            <a
-              href={r.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="rounded-full px-3 py-1 font-mono text-[10px] uppercase tracking-[0.16em]"
-              style={{
-                background: "var(--bunq-surface)",
-                color: "var(--bunq-muted)",
-                border: "1px solid var(--bunq-border)",
-              }}
-            >
-              YouTube ↗
-            </a>
-          </div>
+          <>
+            <div className="mt-2 flex gap-2">
+              <button
+                onClick={onAnalyze}
+                disabled={disabled || done}
+                className="flex-1 rounded-full px-3 py-1 font-mono text-[10px] uppercase tracking-[0.16em] disabled:opacity-40"
+                style={
+                  done
+                    ? {
+                        background: "var(--bunq-surface)",
+                        color: "var(--bunq-green)",
+                        border: "1px solid rgba(181,255,0,0.30)",
+                      }
+                    : {
+                        background: "var(--bunq-green-soft)",
+                        color: "var(--bunq-green)",
+                        border: "1px solid rgba(181,255,0,0.30)",
+                      }
+                }
+              >
+                {done ? "Added ✓" : error ? "Retry" : "Analyze"}
+              </button>
+              <a
+                href={r.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="rounded-full px-3 py-1 font-mono text-[10px] uppercase tracking-[0.16em]"
+                style={{
+                  background: "var(--bunq-surface)",
+                  color: "var(--bunq-muted)",
+                  border: "1px solid var(--bunq-border)",
+                }}
+              >
+                YouTube ↗
+              </a>
+            </div>
+            {error && (
+              <div
+                className="mt-2 rounded-md px-2 py-1 text-[10px] leading-snug"
+                style={{
+                  background: "var(--bunq-bad-soft)",
+                  color: "var(--bunq-bad)",
+                }}
+              >
+                {error}
+              </div>
+            )}
+          </>
         )}
 
         {isActive && (
@@ -327,11 +357,6 @@ function ResultCard({
                 </div>
               );
             })}
-            {error && (
-              <div className="mt-1 text-[10px] text-[var(--bunq-bad)]">
-                {error}
-              </div>
-            )}
           </div>
         )}
       </div>
