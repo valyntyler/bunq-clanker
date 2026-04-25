@@ -896,6 +896,13 @@ export interface WalletSignal {
   top_city: string | null;
 }
 
+export interface ScanBox {
+  x: number;  // fractions of image width  (0..1)
+  y: number;  // fractions of image height (0..1)
+  w: number;
+  h: number;
+}
+
 export interface ScanDetection {
   object: string;
   brand: string;
@@ -909,6 +916,7 @@ export interface ScanDetection {
   investment_take: string;
   is_listed: boolean;
   wallet: WalletSignal | null;
+  box: ScanBox | null;
 }
 
 export interface ScanResult {

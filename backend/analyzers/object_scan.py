@@ -94,12 +94,19 @@ _USER_TEMPLATE = """Analyze this image and return STRICT JSON of the form:
       "parent_relationship":"explain the brand→parent linkage when they differ — e.g. 'Dove is a personal-care brand owned by Unilever'. Empty when brand and company are the same.",
       "confidence":         0..1,
       "rationale":          "one sentence: how you identified the item visually",
-      "investment_take":    "one short line: macro-level lens on the PARENT company. Be calibrated, not bullish."
+      "investment_take":    "one short line: macro-level lens on the PARENT company. Be calibrated, not bullish.",
+      "box":                { "x": 0..1, "y": 0..1, "w": 0..1, "h": 0..1 }
     },
     ...
   ],
   "scene_summary": "one sentence describing the overall scene"
 }
+
+The "box" field MUST be the bounding box of the detected item as fractions
+of the image's WIDTH and HEIGHT (so x=0,y=0 is top-left, x=1,y=1 is
+bottom-right). Tighten the box to the visible logo / product, not the
+whole frame. Set the box even when the item fills most of the frame —
+that's still a valid box at roughly { "x":0.05, "y":0.05, "w":0.9, "h":0.9 }.
 
 If the image has no recognizable branded items, return an empty detections array.
 Never invent tickers. If unsure of the parent's ticker, leave the ticker field as "".
@@ -158,6 +165,8 @@ def scan_image(image_bytes: bytes) -> dict[str, Any]:
 
         wallet = wallet_signal_for(ticker) if ticker else None
 
+        box = _normalize_box(d.get("box"))
+
         cleaned.append({
             "object": (d.get("object") or "").strip()[:120],
             "brand": brand[:80],
@@ -171,6 +180,7 @@ def scan_image(image_bytes: bytes) -> dict[str, Any]:
             "investment_take": (d.get("investment_take") or "").strip()[:280],
             "is_listed": bool(ticker),
             "wallet": wallet,
+            "box": box,
         })
 
     return {
@@ -358,3 +368,34 @@ def _clamp01(v: Any) -> float:
     except (TypeError, ValueError):
         return 0.0
     return max(0.0, min(1.0, f))
+
+
+def _normalize_box(b: Any) -> dict | None:
+    """Coerce Claude's box output into {x, y, w, h} as 0..1 fractions, or
+    None when malformed / missing. Clamps coords + ensures the box stays
+    inside the image. Some Claude responses occasionally return pixel
+    coords (>1) — we treat those as 'no usable box' since we can't know
+    the source resolution."""
+    if not isinstance(b, dict):
+        return None
+    try:
+        x = float(b.get("x", 0))
+        y = float(b.get("y", 0))
+        w = float(b.get("w", 0))
+        h = float(b.get("h", 0))
+    except (TypeError, ValueError):
+        return None
+    # Reject obviously bad data (zero-size or pixel-scale).
+    if w <= 0 or h <= 0:
+        return None
+    if x > 1.5 or y > 1.5 or w > 1.5 or h > 1.5:
+        return None
+    x = max(0.0, min(1.0, x))
+    y = max(0.0, min(1.0, y))
+    # Clamp w/h so the box doesn't run off the edge.
+    w = max(0.0, min(1.0 - x, w))
+    h = max(0.0, min(1.0 - y, h))
+    if w < 0.02 or h < 0.02:
+        # Sub-2% boxes are usually OCR-on-tiny-text noise — drop.
+        return None
+    return {"x": round(x, 4), "y": round(y, 4), "w": round(w, 4), "h": round(h, 4)}

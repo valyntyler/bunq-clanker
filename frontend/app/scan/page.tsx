@@ -20,6 +20,21 @@ export default function ScanPageWrapper() {
 }
 
 type Status = "idle" | "captured" | "scanning" | "done" | "error";
+type Mode = "snapshot" | "ar";
+
+// One detection still considered "current" — keyed by ticker so identical
+// re-detections refresh the freshness timestamp instead of stacking up.
+interface ArHit {
+  detection: ScanDetection;
+  lastSeen: number;
+  // The box coords are scaled to the LIVE video element so we can render
+  // overlays even when the video resolution differs from the snapshot
+  // we sent to Claude.
+  box: { x: number; y: number; w: number; h: number } | null;
+}
+
+const AR_FRAME_INTERVAL_MS = 2500;
+const AR_HIT_TTL_MS = 6000; // detections fade out N ms after their last refresh
 
 function ScanPage() {
   // The two capture paths:
@@ -28,6 +43,7 @@ function ScanPage() {
   //       to a canvas → blob → POST /scan.
   // Both produce a Blob/File that flows through the same handleFile().
 
+  const [mode, setMode] = useState<Mode>("snapshot");
   const [status, setStatus] = useState<Status>("idle");
   const [error, setError] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -37,6 +53,21 @@ function ScanPage() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const [liveOn, setLiveOn] = useState(false);
+
+  // AR-mode state: ticker → detection (fading window).
+  const [arHits, setArHits] = useState<Record<string, ArHit>>({});
+  const arBusyRef = useRef(false); // skip new captures while one's in flight
+  const arTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [arBackendBusy, setArBackendBusy] = useState(false);
+  const [arError, setArError] = useState<string | null>(null);
+  // Re-render every second so TTL-based fading is reactive even when no
+  // new detections arrive.
+  const [, forceTick] = useState(0);
+  useEffect(() => {
+    if (mode !== "ar" || !liveOn) return;
+    const t = setInterval(() => forceTick((n) => n + 1), 1000);
+    return () => clearInterval(t);
+  }, [mode, liveOn]);
 
   useEffect(() => {
     return () => {
@@ -95,7 +126,80 @@ function ScanPage() {
       v.srcObject = null;
     }
     setLiveOn(false);
+    if (arTimerRef.current) {
+      clearInterval(arTimerRef.current);
+      arTimerRef.current = null;
+    }
+    arBusyRef.current = false;
+    setArHits({});
+    setArError(null);
   }
+
+  // ---- AR mode: throttled continuous capture loop ----
+  useEffect(() => {
+    if (mode !== "ar" || !liveOn) {
+      if (arTimerRef.current) {
+        clearInterval(arTimerRef.current);
+        arTimerRef.current = null;
+      }
+      return;
+    }
+
+    async function tick() {
+      if (arBusyRef.current) return;
+      const v = videoRef.current;
+      if (!v || v.videoWidth === 0) return;
+      arBusyRef.current = true;
+      setArBackendBusy(true);
+      try {
+        const canvas = document.createElement("canvas");
+        canvas.width = v.videoWidth;
+        canvas.height = v.videoHeight;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return;
+        ctx.drawImage(v, 0, 0, canvas.width, canvas.height);
+        const blob = await new Promise<Blob | null>((resolve) =>
+          canvas.toBlob(resolve, "image/jpeg", 0.7),
+        );
+        if (!blob) return;
+        const r = await scanImage(
+          new File([blob], "ar.jpg", { type: "image/jpeg" }),
+        );
+        setArError(null);
+        const now = Date.now();
+        setArHits((prev) => {
+          const next = { ...prev };
+          for (const d of r.detections) {
+            if (!d.is_listed || !d.ticker) continue;
+            next[d.ticker] = {
+              detection: d,
+              lastSeen: now,
+              box: d.box ?? prev[d.ticker]?.box ?? null,
+            };
+          }
+          // Drop expired entries.
+          for (const k of Object.keys(next)) {
+            if (now - next[k].lastSeen > AR_HIT_TTL_MS) delete next[k];
+          }
+          return next;
+        });
+      } catch (e) {
+        setArError((e as Error).message);
+      } finally {
+        arBusyRef.current = false;
+        setArBackendBusy(false);
+      }
+    }
+
+    void tick();
+    arTimerRef.current = setInterval(() => void tick(), AR_FRAME_INTERVAL_MS);
+    return () => {
+      if (arTimerRef.current) {
+        clearInterval(arTimerRef.current);
+        arTimerRef.current = null;
+      }
+    };
+  }, [mode, liveOn]);
 
   async function captureFromVideo() {
     const v = videoRef.current;
@@ -166,23 +270,47 @@ function ScanPage() {
       >
         {liveOn ? (
           <div className="space-y-3">
-            <video
-              ref={videoRef}
-              playsInline
-              muted
-              className="aspect-video w-full rounded-2xl bg-black"
-            />
-            <div className="flex flex-wrap gap-2">
-              <button
-                onClick={captureFromVideo}
-                className="rounded-full px-5 py-2 text-sm font-bold"
-                style={{
-                  background: "var(--bunq-green)",
-                  color: "#0a0d05",
-                }}
-              >
-                ◉ Snap
-              </button>
+            <ModeToggle mode={mode} onChange={setMode} />
+            <div className="relative">
+              <video
+                ref={videoRef}
+                playsInline
+                muted
+                className="aspect-video w-full rounded-2xl bg-black"
+              />
+              {mode === "ar" && (
+                <ArOverlay
+                  hits={arHits}
+                  busy={arBackendBusy}
+                />
+              )}
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              {mode === "snapshot" ? (
+                <button
+                  onClick={captureFromVideo}
+                  className="rounded-full px-5 py-2 text-sm font-bold"
+                  style={{ background: "var(--bunq-green)", color: "#0a0d05" }}
+                >
+                  ◉ Snap
+                </button>
+              ) : (
+                <span
+                  className="flex items-center gap-2 rounded-full px-3 py-1 font-mono text-[10px] uppercase tracking-[0.18em]"
+                  style={{
+                    background: "var(--bunq-green-soft)",
+                    color: "var(--bunq-green)",
+                    border: "1px solid rgba(181,255,0,0.30)",
+                  }}
+                >
+                  <span className={arBackendBusy ? "animate-spin" : ""}>
+                    {arBackendBusy ? "⟳" : "●"}
+                  </span>
+                  <span>
+                    AR · {Object.keys(arHits).length} on-frame
+                  </span>
+                </span>
+              )}
               <button
                 onClick={stopLiveCamera}
                 className="rounded-full px-4 py-2 text-sm"
@@ -195,6 +323,17 @@ function ScanPage() {
                 Cancel
               </button>
             </div>
+            {arError && mode === "ar" && (
+              <div
+                className="rounded-xl px-3 py-2 text-xs"
+                style={{
+                  background: "var(--bunq-bad-soft)",
+                  color: "var(--bunq-bad)",
+                }}
+              >
+                {arError}
+              </div>
+            )}
           </div>
         ) : (
           <div className="grid gap-3 md:grid-cols-2">
@@ -331,6 +470,172 @@ function ScanPage() {
         </section>
       )}
     </main>
+  );
+}
+
+function ModeToggle({
+  mode,
+  onChange,
+}: {
+  mode: Mode;
+  onChange: (m: Mode) => void;
+}) {
+  return (
+    <div
+      className="flex gap-1 rounded-full p-1"
+      style={{
+        background: "var(--bunq-surface-2)",
+        border: "1px solid var(--bunq-border)",
+        width: "fit-content",
+      }}
+    >
+      {(["snapshot", "ar"] as Mode[]).map((m) => (
+        <button
+          key={m}
+          onClick={() => onChange(m)}
+          className="rounded-full px-3 py-1 font-mono text-[10px] uppercase tracking-[0.16em] transition"
+          style={
+            mode === m
+              ? {
+                  background: "var(--bunq-green-soft)",
+                  color: "var(--bunq-green)",
+                  border: "1px solid rgba(181,255,0,0.30)",
+                }
+              : {
+                  background: "transparent",
+                  color: "var(--bunq-muted)",
+                  border: "1px solid transparent",
+                }
+          }
+        >
+          {m === "snapshot" ? "Snapshot" : "Live AR"}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** Absolute-positioned overlay for AR mode — renders one floating pill per
+ *  detected branded item, anchored to its bounding box (or the centre of
+ *  the frame if Claude didn't return a usable box). Detections fade out
+ *  AR_HIT_TTL_MS after their last refresh so the HUD doesn't pile up
+ *  stale items as the camera moves. */
+function ArOverlay({
+  hits,
+  busy,
+}: {
+  hits: Record<string, ArHit>;
+  busy: boolean;
+}) {
+  const now = Date.now();
+  const items = Object.values(hits);
+  return (
+    <div className="pointer-events-none absolute inset-0">
+      {/* Status banner top-left */}
+      <div className="pointer-events-none absolute left-3 top-3">
+        <span
+          className="flex items-center gap-1.5 rounded-full px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.18em]"
+          style={{
+            background: "rgba(0,0,0,0.55)",
+            color: busy ? "var(--bunq-green)" : "var(--bunq-text)",
+            border: "1px solid rgba(181,255,0,0.25)",
+            backdropFilter: "blur(4px)",
+          }}
+        >
+          <span className={busy ? "animate-spin" : ""}>
+            {busy ? "⟳" : "●"}
+          </span>
+          ar · {items.length} {items.length === 1 ? "item" : "items"}
+        </span>
+      </div>
+
+      {items.length === 0 && !busy && (
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+          <span
+            className="rounded-full px-3 py-1 font-mono text-[10px] uppercase tracking-[0.18em]"
+            style={{
+              background: "rgba(0,0,0,0.5)",
+              color: "rgba(255,255,255,0.65)",
+              backdropFilter: "blur(4px)",
+            }}
+          >
+            point at a branded product
+          </span>
+        </div>
+      )}
+
+      {items.map((hit) => (
+        <ArHitOverlay key={hit.detection.ticker} hit={hit} now={now} />
+      ))}
+    </div>
+  );
+}
+
+function ArHitOverlay({ hit, now }: { hit: ArHit; now: number }) {
+  const age = now - hit.lastSeen;
+  const ttl = AR_HIT_TTL_MS;
+  // Linear opacity fall-off in the last 1.5 seconds before TTL expiry so the
+  // overlay doesn't pop out abruptly.
+  const fade = Math.max(0, Math.min(1, (ttl - age) / 1500));
+  const d = hit.detection;
+  const box = hit.box;
+
+  // Position: prefer the bounding box; otherwise float a centred pill.
+  const positionStyle: React.CSSProperties = box
+    ? {
+        left: `${box.x * 100}%`,
+        top: `${box.y * 100}%`,
+        width: `${box.w * 100}%`,
+        height: `${box.h * 100}%`,
+      }
+    : {
+        left: "10%",
+        top: "10%",
+        width: "80%",
+        height: "80%",
+      };
+
+  // Verdict colouring is opt-in: until we wire a quick-verdict cache, every
+  // detected ticker just shows the brand → parent chip + tap-to-analyse CTA.
+  return (
+    <Link
+      href={`/analyze/${encodeURIComponent(d.ticker)}`}
+      className="pointer-events-auto absolute"
+      style={{
+        ...positionStyle,
+        opacity: fade,
+        transition: "opacity 250ms linear",
+      }}
+      title={`Analyse ${d.company || d.ticker}`}
+    >
+      {/* Bounding-box outline */}
+      {box && (
+        <div
+          className="absolute inset-0 rounded-xl"
+          style={{
+            border: "1.5px solid var(--bunq-green)",
+            boxShadow:
+              "0 0 0 1px rgba(0,0,0,0.55), 0 6px 24px -6px rgba(181,255,0,0.45)",
+            background: "rgba(181,255,0,0.04)",
+          }}
+        />
+      )}
+      {/* Pill anchored to top-left of the box */}
+      <div
+        className="absolute -top-2 left-2 flex items-center gap-2 rounded-full px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.16em]"
+        style={{
+          background: "rgba(8,10,5,0.86)",
+          color: "var(--bunq-green)",
+          border: "1px solid rgba(181,255,0,0.45)",
+          backdropFilter: "blur(6px)",
+          whiteSpace: "nowrap",
+        }}
+      >
+        <span className="bunq-numeral font-bold">{d.ticker}</span>
+        <span className="opacity-80">{d.brand || d.object}</span>
+        <span className="opacity-70">↗</span>
+      </div>
+    </Link>
   );
 }
 
