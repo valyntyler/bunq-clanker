@@ -366,7 +366,9 @@ class TtsPlayer {
       this.current.src = "";
       this.current = null;
     }
-    // Also cut any browser-fallback synthesis that might be running.
+    // Belt-and-braces: if the browser had any speechSynthesis utterance
+    // queued from before this rewrite landed (e.g. a long-running tab),
+    // cut it. Cheap, safe.
     if (typeof window !== "undefined" && "speechSynthesis" in window) {
       try {
         window.speechSynthesis.cancel();
@@ -401,20 +403,14 @@ class TtsPlayer {
       audio.playbackRate = 1.05;
       return audio;
     } catch (e) {
-      if (signal.aborted) return null;
-      // Fallback: browser speechSynthesis. Robotic, but it speaks.
-      if (
-        typeof window !== "undefined" &&
-        "speechSynthesis" in window &&
-        !this.cancelled
-      ) {
-        try {
-          const u = new SpeechSynthesisUtterance(text);
-          u.rate = 1.05;
-          window.speechSynthesis.speak(u);
-        } catch {
-          // ignore
-        }
+      // Deliberately NO speechSynthesis fallback. Two voices on top of
+      // each other (the OS robotic one over a slightly-lagged Polly mp3
+      // from the previous sentence) is the worst possible UX. If Polly
+      // errors, this sentence is silently dropped — user still sees the
+      // text reply and can read it. They can re-fire the question to
+      // try again.
+      if (!signal.aborted) {
+        console.warn("voice tts failed:", (e as Error).message);
       }
       return null;
     }
