@@ -38,9 +38,7 @@ export function isVoiceInputSupported(): boolean {
   );
 }
 
-export function isTtsSupported(): boolean {
-  return typeof window !== "undefined" && "speechSynthesis" in window;
-}
+// (isTtsSupported is declared further down with the Polly TTS section.)
 
 // Pick a MediaRecorder mimeType that this browser actually supports. Order
 // matters: Chrome/Firefox prefer webm/opus; Safari only does mp4/m4a.
@@ -302,77 +300,235 @@ export function useMicRecorder(opts: UseRecorderOpts): RecorderHandle {
   return { active, level, transcribing, error, start, stop };
 }
 
-/** Pick a clean voice if the browser has one. Order of preference:
- *  - en-US Google US English
- *  - en-US Microsoft Aria / Jenny
- *  - any en-* voice with "natural" or "neural" in the name
- *  - first en-* voice
- *  - default
- */
-let _cachedVoice: SpeechSynthesisVoice | null | undefined;
+// ---------------------------------------------------------------------
+// Speech output — Amazon Polly Neural via the backend.
+//
+// Browser speechSynthesis sounds robotic and the OS-shipped voices vary
+// wildly. Polly's neural engine ('Joanna', 'Matthew', 'Stephen', 'Joey')
+// sounds genuinely human. The trade-off is a 1-2s round-trip per request,
+// which is why we stream sentence-by-sentence below: as soon as the first
+// sentence of the Claude reply is complete we hand it to Polly and start
+// playing, while the next sentence is still being generated. Net effect
+// is that audio playback begins ~1s after the first sentence finishes,
+// not after the full reply.
+//
+// Falls back silently to browser speechSynthesis if /voice/tts errors.
+// ---------------------------------------------------------------------
 
-function pickVoice(): SpeechSynthesisVoice | null {
-  if (_cachedVoice !== undefined) return _cachedVoice;
-  if (!isTtsSupported()) {
-    _cachedVoice = null;
-    return null;
-  }
-  const voices = window.speechSynthesis.getVoices();
-  if (!voices.length) {
-    return null; // populate is async on Chrome; caller will retry.
-  }
-  const en = voices.filter((v) => v.lang.startsWith("en"));
-  const score = (v: SpeechSynthesisVoice): number => {
-    const n = v.name.toLowerCase();
-    let s = 0;
-    if (n.includes("google")) s += 5;
-    if (n.includes("aria") || n.includes("jenny")) s += 4;
-    if (n.includes("natural") || n.includes("neural")) s += 3;
-    if (v.lang.toLowerCase() === "en-us") s += 2;
-    if (v.localService) s += 1;
-    return s;
-  };
-  const pool = en.length > 0 ? en : voices;
-  pool.sort((a, b) => score(b) - score(a));
-  _cachedVoice = pool[0] ?? null;
-  return _cachedVoice;
+export interface TtsOptions {
+  voice?: "Joanna" | "Matthew" | "Stephen" | "Joey" | string;
 }
 
-export function speakText(text: string, opts?: { rate?: number; pitch?: number }) {
-  if (!isTtsSupported() || !text.trim()) return;
-  const synth = window.speechSynthesis;
-  try {
-    synth.cancel();
-  } catch {
-    // ignore
+export function isTtsSupported(): boolean {
+  // Even with backend Polly, the playback path needs <audio>. Effectively
+  // every browser supports that.
+  return typeof window !== "undefined" && "Audio" in window;
+}
+
+// One global player queue: mp3 blobs play sequentially, no overlap.
+class TtsPlayer {
+  private queue: Promise<HTMLAudioElement | null>[] = [];
+  private current: HTMLAudioElement | null = null;
+  private fetching: AbortController[] = [];
+  private cancelled = false;
+
+  /** Enqueue a sentence to be synthesised + spoken. Returns immediately;
+   *  the actual fetch + play happens in the background. */
+  enqueue(text: string, opts?: TtsOptions) {
+    const cleaned = cleanForSpeech(text);
+    if (!cleaned) return;
+    this.cancelled = false;
+    const ac = new AbortController();
+    this.fetching.push(ac);
+    const fetchPromise = this.fetchTts(cleaned, opts, ac.signal);
+    this.queue.push(fetchPromise);
+    void this.pump();
   }
-  const u = new SpeechSynthesisUtterance(text);
-  const voice = pickVoice();
-  if (voice) u.voice = voice;
-  u.rate = opts?.rate ?? 1.05;
-  u.pitch = opts?.pitch ?? 1.0;
-  synth.speak(u);
+
+  /** Cancel everything: in-flight fetches, queued audio, currently playing. */
+  cancel() {
+    this.cancelled = true;
+    for (const ac of this.fetching) {
+      try {
+        ac.abort();
+      } catch {
+        // ignore
+      }
+    }
+    this.fetching = [];
+    this.queue = [];
+    if (this.current) {
+      try {
+        this.current.pause();
+      } catch {
+        // ignore
+      }
+      this.current.src = "";
+      this.current = null;
+    }
+    // Also cut any browser-fallback synthesis that might be running.
+    if (typeof window !== "undefined" && "speechSynthesis" in window) {
+      try {
+        window.speechSynthesis.cancel();
+      } catch {
+        // ignore
+      }
+    }
+  }
+
+  private async fetchTts(
+    text: string,
+    opts: TtsOptions | undefined,
+    signal: AbortSignal,
+  ): Promise<HTMLAudioElement | null> {
+    try {
+      const r = await fetch(`${BACKEND_URL}/voice/tts`, {
+        method: "POST",
+        headers: { "content-type": "application/json", ...authHeader() },
+        body: JSON.stringify({
+          text,
+          voice: opts?.voice ?? "Joanna",
+        }),
+        signal,
+      });
+      if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
+      const blob = await r.blob();
+      if (signal.aborted) return null;
+      const url = URL.createObjectURL(blob);
+      const audio = new Audio(url);
+      audio.preload = "auto";
+      // Slight playbackRate bump — Joanna's default cadence is a touch slow.
+      audio.playbackRate = 1.05;
+      return audio;
+    } catch (e) {
+      if (signal.aborted) return null;
+      // Fallback: browser speechSynthesis. Robotic, but it speaks.
+      if (
+        typeof window !== "undefined" &&
+        "speechSynthesis" in window &&
+        !this.cancelled
+      ) {
+        try {
+          const u = new SpeechSynthesisUtterance(text);
+          u.rate = 1.05;
+          window.speechSynthesis.speak(u);
+        } catch {
+          // ignore
+        }
+      }
+      return null;
+    }
+  }
+
+  private async pump() {
+    if (this.current) return; // already playing — pump will resume after
+    while (this.queue.length > 0) {
+      if (this.cancelled) return;
+      const next = this.queue.shift();
+      if (!next) continue;
+      const audio = await next;
+      if (this.cancelled) return;
+      if (!audio) continue;
+      this.current = audio;
+      try {
+        await new Promise<void>((resolve) => {
+          const cleanup = () => {
+            audio.removeEventListener("ended", cleanup);
+            audio.removeEventListener("error", cleanup);
+            resolve();
+          };
+          audio.addEventListener("ended", cleanup);
+          audio.addEventListener("error", cleanup);
+          audio.play().catch(() => cleanup());
+        });
+      } finally {
+        this.current = null;
+        // Free the blob URL we created.
+        try {
+          if (audio.src.startsWith("blob:")) URL.revokeObjectURL(audio.src);
+        } catch {
+          // ignore
+        }
+      }
+    }
+  }
+}
+
+const _player = new TtsPlayer();
+
+/** Speak a complete chunk of text. For the chat-panel use case, prefer
+ *  speakStreaming() — it picks sentence boundaries from a growing token
+ *  stream so playback can start before the full reply lands. */
+export function speakText(text: string, opts?: TtsOptions) {
+  if (!isTtsSupported() || !text.trim()) return;
+  _player.enqueue(text, opts);
 }
 
 export function stopSpeaking() {
   if (!isTtsSupported()) return;
-  try {
-    window.speechSynthesis.cancel();
-  } catch {
-    // ignore
+  _player.cancel();
+}
+
+/** Stateful streaming TTS — call onToken() with each new bit of text from
+ *  the chat stream; we'll synthesise + play complete sentences as they
+ *  finish. Returns a `flush()` you call when streaming ends so any final
+ *  trailing fragment also gets spoken.
+ *
+ *  Sentence boundaries: split on `.`, `!`, `?`, `\n`, with a minimum length
+ *  of 30 chars so we don't fire one-word mp3s for "Yes." / "No." (Polly
+ *  has a per-call latency floor; cramming many tiny calls makes it feel
+ *  laggier, not faster).
+ */
+export function makeStreamingTts(opts?: TtsOptions) {
+  let buf = "";
+  let stopped = false;
+  const SENTENCE_RE = /[.!?\n]+\s*/g;
+
+  function pushBuffer(): void {
+    if (stopped) return;
+    let lastEnd = 0;
+    let m: RegExpExecArray | null;
+    SENTENCE_RE.lastIndex = 0;
+    while ((m = SENTENCE_RE.exec(buf)) !== null) {
+      const end = m.index + m[0].length;
+      const candidate = buf.slice(lastEnd, end).trim();
+      if (candidate.length >= 30) {
+        _player.enqueue(candidate, opts);
+        lastEnd = end;
+      }
+    }
+    buf = buf.slice(lastEnd);
   }
+
+  return {
+    onToken(token: string) {
+      if (stopped) return;
+      buf += token;
+      // Only attempt to drain when we hit punctuation, otherwise we re-scan
+      // every token unnecessarily. (Cheap enough either way; this is
+      // micro-optimisation.)
+      if (/[.!?\n]/.test(token)) pushBuffer();
+    },
+    flush() {
+      if (stopped) return;
+      pushBuffer();
+      const tail = buf.trim();
+      if (tail.length >= 6) {
+        _player.enqueue(tail, opts);
+      }
+      buf = "";
+    },
+    cancel() {
+      stopped = true;
+      buf = "";
+      _player.cancel();
+    },
+  };
 }
 
 export function warmVoices() {
-  if (!isTtsSupported()) return;
-  window.speechSynthesis.getVoices();
-  const onChange = () => {
-    _cachedVoice = undefined;
-    pickVoice();
-  };
-  window.speechSynthesis.addEventListener("voiceschanged", onChange, {
-    once: true,
-  });
+  // Kept for API compatibility with the speechSynthesis-era code; Polly
+  // doesn't need warming. No-op.
 }
 
 /** Strip Markdown / citation noise so TTS reads cleanly. */

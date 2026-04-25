@@ -4,10 +4,9 @@ import { useEffect, useRef, useState } from "react";
 import { Markdown } from "@/components/Markdown";
 import { chatStream, type ChatTurn, type Report } from "@/lib/api";
 import {
-  cleanForSpeech,
   isTtsSupported,
   isVoiceInputSupported,
-  speakText,
+  makeStreamingTts,
   stopSpeaking,
   useMicRecorder,
   warmVoices,
@@ -87,6 +86,11 @@ export function ChatPanel({ report }: { report: Report }) {
     setStreaming(true);
     setStreamingText("");
     let acc = "";
+    // Streaming TTS — plays each sentence through Polly as soon as it
+    // finishes generating, so audio starts ~1s after the first sentence
+    // completes instead of after the full reply.
+    const tts =
+      ttsOn && ttsAvail ? makeStreamingTts({ voice: "Joanna" }) : null;
     try {
       await chatStream({
         ticker: report.ticker,
@@ -96,14 +100,11 @@ export function ChatPanel({ report }: { report: Report }) {
         onToken: (t) => {
           acc += t;
           setStreamingText(acc);
+          tts?.onToken(t);
         },
       });
       setHistory([...newHistory, { role: "assistant", content: acc }]);
-      if (ttsOn && ttsAvail) {
-        // Speak the cleaned full reply once streaming has finished, so
-        // we don't stutter on token boundaries.
-        speakText(cleanForSpeech(acc));
-      }
+      tts?.flush();
     } catch (e) {
       setHistory([
         ...newHistory,
@@ -112,6 +113,7 @@ export function ChatPanel({ report }: { report: Report }) {
           content: `(error: ${(e as Error).message})`,
         },
       ]);
+      tts?.cancel();
     } finally {
       setStreaming(false);
       setStreamingText("");

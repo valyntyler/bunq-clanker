@@ -25,7 +25,9 @@ import json as _json
 from dotenv import load_dotenv
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import Response, StreamingResponse
+
+import boto3
 
 load_dotenv()
 
@@ -712,6 +714,51 @@ def me_analyses(
     }
 
 
+# ---- voice TTS — Amazon Polly neural for spoken replies --------------
+
+
+@app.post("/voice/tts")
+async def voice_tts(payload: dict, user: User = Depends(require_user)) -> Response:
+    """Synthesise a chunk of text into mp3 via Amazon Polly Neural.
+
+    Body:
+        { text: str, voice?: 'Joanna' | 'Matthew' | 'Stephen' | 'Joey' | ... }
+
+    Returns:
+        audio/mpeg bytes. The frontend plays them through an <audio>
+        element. Sentence-level chunking happens client-side so the
+        chat panel can start playback before the full reply finishes.
+    """
+    text = (payload.get("text") or "").strip()
+    voice = (payload.get("voice") or "Joanna").strip()
+    if not text:
+        raise HTTPException(400, "text required")
+    # Polly's synthesize_speech caps at 3000 chars per call; chunk if longer.
+    if len(text) > 3000:
+        text = text[:2999]
+    try:
+        polly = boto3.client("polly", region_name=os.environ.get("AWS_REGION", "us-east-1"))
+        resp = await asyncio.to_thread(
+            polly.synthesize_speech,
+            Engine="neural",
+            OutputFormat="mp3",
+            Text=text,
+            VoiceId=voice,
+            LanguageCode="en-US",
+            TextType="text",
+        )
+        audio_stream = resp.get("AudioStream")
+        if audio_stream is None:
+            raise RuntimeError("Polly returned no AudioStream")
+        body = await asyncio.to_thread(audio_stream.read)
+    except HTTPException:
+        raise
+    except Exception as e:  # noqa: BLE001
+        log.exception("voice tts failed")
+        raise HTTPException(503, f"polly failed: {e}")
+    return Response(content=body, media_type="audio/mpeg")
+
+
 # ---- voice transcribe — short clips for the chat-panel mic button ----
 
 
@@ -777,9 +824,10 @@ async def voice_transcribe(
             MediaFormat=fmt,
             LanguageCode="en-US",
         )
-        # Poll up to ~30s — voice clips are short so jobs complete fast.
-        for _ in range(20):
-            await asyncio.sleep(1.5)
+        # Tight polling — voice clips are short so jobs land fast (~2-4s).
+        # Use a 0.5s cadence so we don't sit waiting for the next slot.
+        for _ in range(60):  # 60 * 0.5 = 30s budget
+            await asyncio.sleep(0.5)
             j = client.get_transcription_job(TranscriptionJobName=job_name)
             status = j["TranscriptionJob"]["TranscriptionJobStatus"]
             if status == "COMPLETED":
